@@ -2,33 +2,30 @@
 
 #include <google/output_string.h>
 
-class OutputString : public open_vcdiff::OutputStringInterface {
+class OutputJSCallbackBase {
 public:
-	virtual OutputString& append(const char* s, size_t n) {
-		data_.append(s, n);
+	virtual ~OutputJSCallbackBase() {};
+
+	virtual void append(const char* s, unsigned int n) = 0;
+};
+
+class OutputJS : public open_vcdiff::OutputStringInterface {
+public:
+	OutputJS(OutputJSCallbackBase *callbacks) : callbacks_(callbacks) {}
+
+	virtual OutputJS& append(const char* s, size_t n) {
+		callbacks_->append(s, n);
 		return *this;
 	}
 
-	virtual void clear() {
-		data_.clear();
-	}
+	virtual void clear() { abort(); }
 
-	virtual void push_back(char c) {
-		data_.push_back(c);
-	}
+	virtual void push_back(char) { abort(); }
 
-	virtual void ReserveAdditionalBytes(size_t res_arg) {
-		data_.reserve(data_.size() + res_arg);
-	}
+	virtual void ReserveAdditionalBytes(size_t) { /* NOOP */ }
 
-	virtual size_t size() const {
-		return data_.size();
-	}
-
-	const char *data() const {
-		return data_.data();
-	}
+	virtual size_t size() const { abort(); }
 
 private:
-	std::string data_;
+	OutputJSCallbackBase *callbacks_;
 };

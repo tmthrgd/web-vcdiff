@@ -1,13 +1,19 @@
-interface OutputString {
-	void OutputString();
-	[Const] DOMString data();
-	unsigned long size();
+interface OutputJSCallbackBase {};
+
+[JSImplementation="OutputJSCallbackBase"]
+interface OutputJSCallback {
+	void OutputJSCallback();
+	void append([Const] DOMString s, unsigned long n);
+};
+
+interface OutputJS {
+	void OutputJS(OutputJSCallback callbacks);
 };
 
 [Prefix="open_vcdiff::"]
 interface VCDiffStreamingDecoder {
 	void VCDiffStreamingDecoder();
 	void StartDecoding([Const] DOMString dictionary_ptr, unsigned long dictionary_size);
-	boolean DecodeChunkToInterface([Const] DOMString data, unsigned long len, OutputString output);
+	boolean DecodeChunkToInterface([Const] DOMString data, unsigned long len, OutputJS output);
 	boolean FinishDecoding();
 };
