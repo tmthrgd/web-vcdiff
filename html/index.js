@@ -1,7 +1,12 @@
 import Module from '/vcddec.js';
 
 async function moduleLoaded(m) {
-	const dict = new Uint8Array([84, 104, 101, 32, 113, 117, 105, 99, 107, 32, 98, 114, 111, 119, 110, 32, 102, 111, 120, 32, 106, 117, 109, 112, 115, 32, 111, 118, 101, 114, 32, 116, 104, 101, 32, 108, 97, 122, 121, 32, 100, 111, 103, 46, 10]);
+	const dictResp = await fetch('/test.dict');
+	if (!dictResp.ok) {
+		throw new Error('failed to load /test.dict: ' + dictResp.statusText);
+	}
+
+	const dict = new Uint8Array(await dictResp.arrayBuffer());
 	const data = new Uint8Array([214, 195, 196, 0, 0, 1, 45, 0, 8, 44, 0, 0, 2, 1, 115, 44, 0]);
 
 	const dictPtr = m._malloc(dict.length);
