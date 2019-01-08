@@ -2,8 +2,10 @@ import Module from '/vcddec.js';
 
 const textDec = new TextDecoder("utf-8");
 
+const dictFetch = fetch('/test.dict');
+
 async function moduleLoaded(m) {
-	const dictResp = await fetch('/test.dict');
+	const dictResp = await dictFetch;
 	if (!dictResp.ok) {
 		throw new Error('failed to load /test.dict: ' + dictResp.statusText);
 	}
