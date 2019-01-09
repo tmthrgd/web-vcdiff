@@ -3,23 +3,25 @@ import Decoder from '/decoder.js';
 
 const textDec = new TextDecoder('utf-8');
 
-const dictFetch = fetch('/test.dict');
-
-async function moduleLoaded(m) {
-	const dictResp = await dictFetch;
-	if (!dictResp.ok) {
-		throw new Error('failed to load /test.dict: ' + dictResp.statusText);
+const must200 = resp => {
+	if (!resp.ok) {
+		throw new Error('failed to load ' + resp.url + ': ' + resp.statusText);
 	}
 
-	const dict = new Uint8Array(await dictResp.arrayBuffer());
-	const data = new Uint8Array([214, 195, 196, 0, 0, 1, 45, 0, 8, 44, 0, 0, 2, 1, 115, 44, 0]);
+	return resp;
+};
+const asUint8Array = async resp => new Uint8Array(await resp.arrayBuffer());
 
+const dictFetch = fetch('/test.dict').then(must200).then(asUint8Array);
+const dataFetch = fetch('/test.diff').then(must200).then(asUint8Array);
+
+async function moduleLoaded(m) {
 	const dec = new Decoder(m, s => {
 		console.log(textDec.decode(s), s.length);
 	});
 	try {
-		dec.start(dict);
-		dec.decode(data);
+		dec.start(await dictFetch);
+		dec.decode(await dataFetch);
 		dec.finish();
 	} finally {
 		dec.destroy();
