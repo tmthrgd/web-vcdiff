@@ -1,13 +1,9 @@
-interface OutputJSCallbackBase {};
+interface OutputJSBase {};
 
-[JSImplementation="OutputJSCallbackBase"]
-interface OutputJSCallback {
-	void OutputJSCallback();
-	void append([Const] DOMString s, unsigned long n);
-};
-
+[JSImplementation="OutputJSBase"]
 interface OutputJS {
-	void OutputJS(OutputJSCallback callbacks);
+	void OutputJS();
+	void appendCallback([Const] DOMString s, unsigned long n);
 };
 
 [Prefix="open_vcdiff::"]

@@ -1,20 +1,9 @@
-#include <string>
-
 #include <google/output_string.h>
 
-class OutputJSCallbackBase {
+class OutputJSBase : public open_vcdiff::OutputStringInterface {
 public:
-	virtual ~OutputJSCallbackBase() {};
-
-	virtual void append(const char* s, unsigned int n) = 0;
-};
-
-class OutputJS : public open_vcdiff::OutputStringInterface {
-public:
-	OutputJS(OutputJSCallbackBase *callbacks) : callbacks_(callbacks) {}
-
-	virtual OutputJS& append(const char* s, size_t n) {
-		callbacks_->append(s, n);
+	virtual OutputJSBase& append(const char* s, size_t n) {
+		appendCallback(s, n);
 		return *this;
 	}
 
@@ -26,6 +15,6 @@ public:
 
 	virtual size_t size() const { abort(); }
 
-private:
-	OutputJSCallbackBase *callbacks_;
+protected:
+	virtual void appendCallback(const char* s, unsigned int n) = 0;
 };
