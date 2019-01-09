@@ -1,6 +1,6 @@
 import Module from '/vcddec.js';
 
-const textDec = new TextDecoder("utf-8");
+const textDec = new TextDecoder('utf-8');
 
 const dictFetch = fetch('/test.dict');
 
