@@ -30,11 +30,12 @@ const decodeResp = async (dec, resp) => {
 const dictFetch = fetch('/test.dict').then(must200).then(asUint8Array);
 const dataFetch = fetch('/test.diff').then(must200);
 
-const textDec = new TextDecoder('utf-8');
-
 async function moduleLoaded(m) {
-	const dec = new Decoder(m, s => {
-		console.log(textDec.decode(s), s.length);
+	const textDec = new TextDecoder('utf-8');
+
+	const dec = new Decoder(m, data => {
+		const text = textDec.decode(data, { stream: true });
+		console.log(text, data.length);
 	});
 	try {
 		dec.start(await dictFetch);
@@ -43,6 +44,9 @@ async function moduleLoaded(m) {
 	} finally {
 		dec.destroy();
 	}
+
+	const last = textDec.decode();
+	last && console.log(last);
 }
 
 Module().then(m => moduleLoaded(m).catch(console.error));
