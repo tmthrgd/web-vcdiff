@@ -1,3 +1,20 @@
+const debug = true;
+
+const debugAppend = (cb, data) => {
+	// The appendCallback passed to constructor cannot retain the memory
+	// passed to it as it is only valid for the lifetime of the call. This
+	// is an optional debug function that passes a copy of the memory to
+	// the callback and zeros it afterwards to ensure the memory is either
+	// used or copied by the time the callback returns.
+
+	const copy = data.slice();
+	cb(copy);
+
+	for (let i = 0; i < copy.length; i++) {
+		copy[i] = 0;
+	}
+};
+
 export default class {
 	constructor(m, cb) {
 		if (!m || !m.VCDiffStreamingDecoder) {
@@ -8,7 +25,10 @@ export default class {
 		this._dec = new m.VCDiffStreamingDecoder();
 
 		const out = new m.OutputJS();
-		out.appendCallback = (s, n) => cb(this._heap.subarray(s, s + n));
+		out.appendCallback = (s, n) => {
+			const data = this._heap.subarray(s, s + n);
+			debug ? debugAppend(cb, data) : cb(data);
+		};
 		this._out = out;
 	}
 
