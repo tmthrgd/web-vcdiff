@@ -82,18 +82,23 @@ const decodeBuffer = async (resp, dict) => {
 	return body.subarray(0, pos);
 };
 
-const dictFetch = fetch('/test.dict').then(must200).then(asUint8Array);
-
 const decode = async resp => {
 	const encHdr = resp.headers.get('Content-Diff-Encoding');
 	if (!encHdr || encHdr.toLowerCase() !== 'vcdiff') {
 		return resp;
 	}
 
-	const body = resp.body ? decodeStream(resp, dictFetch) : await decodeBuffer(resp, dictFetch);
+	const dictHdr = resp.headers.get('Content-Diff-Dictionary');
+	if (!dictHdr) {
+		throw new Error('missing Content-Diff-Dictionary header for ' + resp.url);
+	}
+
+	const dict = fetch(dictHdr).then(must200).then(asUint8Array);
+	const body = resp.body ? decodeStream(resp, dict) : await decodeBuffer(resp, dict);
 
 	resp = new Response(body, resp);
 	resp.headers.delete('Content-Diff-Encoding');
+	resp.headers.delete('Content-Diff-Dictionary');
 	return resp;
 };
 

@@ -33,8 +33,10 @@ func main() {
 
 	html := http.FileServer(http.Dir("html"))
 	mux.Handle("/", html)
-	mux.Handle("/test.diff", handlers.SetHeader(html,
-		"Content-Diff-Encoding", "vcdiff"))
+	mux.Handle("/test.diff", handlers.SetHeaders(html, map[string]string{
+		"Content-Diff-Encoding":   "vcdiff",
+		"Content-Diff-Dictionary": "/test.dict",
+	}))
 
 	fmt.Printf("Listening on %s\n", *addr)
 	panic(http.ListenAndServe(*addr, mux))
