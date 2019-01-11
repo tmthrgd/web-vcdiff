@@ -4,6 +4,7 @@ interface OutputJSBase {};
 interface OutputJS {
 	void OutputJS();
 	void appendCallback([Const] DOMString s, unsigned long n);
+	void reserveCallback(unsigned long n);
 };
 
 [Prefix="open_vcdiff::"]

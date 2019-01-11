@@ -33,9 +33,11 @@ const dataFetch = fetch('/test.diff').then(must200);
 async function moduleLoaded(m) {
 	const textDec = new TextDecoder('utf-8');
 
-	const dec = new Decoder(m, data => {
-		const text = textDec.decode(data, { stream: true });
-		console.log(text, data.length);
+	const dec = new Decoder(m, {
+		append(data) {
+			const text = textDec.decode(data, { stream: true });
+			console.log(text, data.length);
+		},
 	});
 	try {
 		dec.start(await dictFetch);
