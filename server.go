@@ -35,8 +35,9 @@ func main() {
 	mux.Handle("/", html)
 	mux.Handle("/test.diff", handlers.SetHeaders(html, map[string]string{
 		"Content-Diff-Encoding":   "vcdiff",
-		"Content-Diff-Dictionary": "/test.dict",
+		"Content-Diff-Dictionary": "/test.dict#b47cc0f104b6",
 	}))
+	mux.Handle("/test.dict", handlers.SetHeader(html, "Vary", "Expect-Diff-Hash"))
 
 	fmt.Printf("Listening on %s\n", *addr)
 	panic(http.ListenAndServe(*addr, mux))

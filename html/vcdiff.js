@@ -76,20 +76,28 @@ const decodeBuffer = async (resp, dict) => {
 
 const dictCache = caches.open('vcdiff-dict');
 
-const loadDict = async url => {
+const loadDict = async header => {
 	const cache = await dictCache;
 
-	const entry = await cache.match(url);
+	const url = new URL(header, location);
+	const hash = url.hash && url.hash.slice(1);
+	url.hash = '';
+	const req = new Request(url, {
+		cache: 'no-store',
+		headers: hash ? { 'Expect-Diff-Hash': hash } : {},
+	});
+
+	const entry = await cache.match(req);
 	if (entry) {
 		return entry;
 	}
 
-	const resp = await fetch(url);
+	const resp = await fetch(req);
 	if (!resp.ok) {
 		throw new Error('failed to load ' + resp.url + ': ' + resp.statusText);
 	}
 
-	cache.put(url, resp.clone()).catch(err => {
+	cache.put(req, resp.clone()).catch(err => {
 		console.error('failed to store dictionary in cache:', err);
 	});
 	return resp;
