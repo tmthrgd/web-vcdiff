@@ -29,7 +29,7 @@ export default class {
 			const data = this._heap.subarray(s, s + n);
 			debug ? debugAppend(cb.append, data) : cb.append(data);
 		};
-		out.reserveCallback = cb.reserve || (n => { /*NOOP */ });
+		out.reserveCallback = cb.reserve || (n => { /* NOOP */ });
 		this._out = out;
 	}
 
