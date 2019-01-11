@@ -1,14 +1,6 @@
 import Module from '/vcddec.js';
 import Decoder from '/decoder.js';
 
-const must200 = resp => {
-	if (!resp.ok) {
-		throw new Error('failed to load ' + resp.url + ': ' + resp.statusText);
-	}
-
-	return resp;
-};
-
 const asUint8Array = async resp => new Uint8Array(await resp.arrayBuffer());
 
 const m = new Promise(resolve => {
@@ -82,6 +74,33 @@ const decodeBuffer = async (resp, dict) => {
 	return body.subarray(0, pos);
 };
 
+const dictCache = caches.open('vcdiff-dict');
+
+const loadDict = async url => {
+	const cache = await dictCache;
+
+	const entry = await cache.match(url);
+	if (entry) {
+		return entry;
+	}
+
+	const resp = await fetch(url);
+	if (!resp.ok) {
+		throw new Error('failed to load ' + resp.url + ': ' + resp.statusText);
+	}
+
+	cache.put(url, resp.clone()).catch(err => {
+		console.error('failed to store dictionary in cache:', err);
+	});
+	return resp;
+};
+
+const flushCache = async () => {
+	const cache = await dictCache;
+	const keys = await cache.keys();
+	await Promise.all(keys.map(req => cache.delete(req)));
+};
+
 const decode = async resp => {
 	const encHdr = resp.headers.get('Content-Diff-Encoding');
 	if (!encHdr || encHdr.toLowerCase() !== 'vcdiff') {
@@ -93,7 +112,7 @@ const decode = async resp => {
 		throw new Error('missing Content-Diff-Dictionary header for ' + resp.url);
 	}
 
-	const dict = fetch(dictHdr).then(must200).then(asUint8Array);
+	const dict = loadDict(dictHdr).then(asUint8Array);
 	const body = resp.body ? decodeStream(resp, dict) : await decodeBuffer(resp, dict);
 
 	resp = new Response(body, resp);
@@ -110,4 +129,4 @@ const request = (input, init) => {
 
 const vcdiffFetch = (input, init) => fetch(request(input, init)).then(decode);
 
-export { request, decode, vcdiffFetch as fetch };
+export { request, decode, vcdiffFetch as fetch, flushCache };
