@@ -9,7 +9,7 @@ import (
 func Handler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hdr := w.Header()
-		hdr.Set("Vary", "Accept-Diff-Encoding")
+		hdr.Add("Vary", "Accept-Diff-Encoding")
 
 		if !strings.EqualFold(r.Header.Get("Accept-Diff-Encoding"), "vcdiff") {
 			h.ServeHTTP(w, r)
