@@ -11,14 +11,12 @@ const must200 = resp => {
 
 const asUint8Array = async resp => new Uint8Array(await resp.arrayBuffer());
 
-const dictFetch = fetch('/test.dict').then(must200).then(asUint8Array);
-
 const m = new Promise(resolve => {
 	// See github.com/kripken/emscripten/issues/5820.
 	Module().then(Module => resolve({ Module }));
 });
 
-const decodeStream = resp => new ReadableStream({
+const decodeStream = (resp, dict) => new ReadableStream({
 	async start(controller) {
 		const dec = new Decoder((await m).Module, {
 			append(data) {
@@ -26,7 +24,7 @@ const decodeStream = resp => new ReadableStream({
 			},
 		});
 		try {
-			dec.start(await dictFetch);
+			dec.start(await dict);
 
 			const reader = resp.body.getReader();
 			for (; ;) {
@@ -51,7 +49,7 @@ const decodeStream = resp => new ReadableStream({
 	},
 });
 
-const decodeBuffer = async resp => {
+const decodeBuffer = async (resp, dict) => {
 	let body = new Uint8Array(0);
 	let pos = 0;
 	const reserve = n => {
@@ -74,7 +72,7 @@ const decodeBuffer = async resp => {
 		reserve,
 	});
 	try {
-		dec.start(await dictFetch);
+		dec.start(await dict);
 		dec.decode(await asUint8Array(resp));
 		dec.finish();
 	} finally {
@@ -84,13 +82,15 @@ const decodeBuffer = async resp => {
 	return body.subarray(0, pos);
 };
 
+const dictFetch = fetch('/test.dict').then(must200).then(asUint8Array);
+
 const decode = async resp => {
 	const encHdr = resp.headers.get('Content-Diff-Encoding');
 	if (!encHdr || encHdr.toLowerCase() !== 'vcdiff') {
 		return resp;
 	}
 
-	const body = resp.body ? decodeStream(resp) : await decodeBuffer(resp);
+	const body = resp.body ? decodeStream(resp, dictFetch) : await decodeBuffer(resp, dictFetch);
 
 	resp = new Response(body, resp);
 	resp.headers.delete('Content-Diff-Encoding');
