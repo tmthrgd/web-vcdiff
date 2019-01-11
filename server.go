@@ -37,6 +37,8 @@ func main() {
 	mux.Handle("/test.txt", vcdiff.Handler(html))
 	mux.Handle("/test.dict", handlers.SetHeader(html, "Vary", "Expect-Diff-Hash"))
 
+	log := handlers.AccessLog(mux, nil)
+
 	fmt.Printf("Listening on %s\n", *addr)
-	panic(http.ListenAndServe(*addr, mux))
+	panic(http.ListenAndServe(*addr, log))
 }
