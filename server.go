@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+
+	handlers "github.com/tmthrgd/httphandlers"
 )
 
 func main() {
@@ -29,7 +31,10 @@ func main() {
 			http.FileServer(http.Dir(dir))))
 	}
 
-	mux.Handle("/", http.FileServer(http.Dir("html")))
+	html := http.FileServer(http.Dir("html"))
+	mux.Handle("/", html)
+	mux.Handle("/test.diff", handlers.SetHeader(html,
+		"Content-Diff-Encoding", "vcdiff"))
 
 	fmt.Printf("Listening on %s\n", *addr)
 	panic(http.ListenAndServe(*addr, mux))
