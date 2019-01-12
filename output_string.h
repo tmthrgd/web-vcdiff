@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <google/output_string.h>
 
 class OutputJSBase : public open_vcdiff::OutputStringInterface {
@@ -7,15 +8,15 @@ class OutputJSBase : public open_vcdiff::OutputStringInterface {
 		return *this;
 	}
 
-	virtual void clear() { abort(); }
+	virtual void clear() { std::abort(); }
 
-	virtual void push_back(char) { abort(); }
+	virtual void push_back(char) { std::abort(); }
 
 	virtual void ReserveAdditionalBytes(size_t res_arg) {
 		reserveCallback(res_arg);
 	}
 
-	virtual size_t size() const { abort(); }
+	virtual size_t size() const { std::abort(); }
 
       protected:
 	virtual void appendCallback(const char *s, unsigned int n) = 0;
