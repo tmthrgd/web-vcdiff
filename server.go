@@ -35,7 +35,7 @@ func main() {
 	html := http.FileServer(http.Dir("html"))
 	mux.Handle("/", html)
 	mux.Handle("/test.txt", vcdiff.Handler(html, vcdiff.WithReadFixedDictionary("html/test.dict", "/test.dict")))
-	mux.Handle("/test.dict", handlers.SetHeader(html, "Vary", "Expect-Diff-Hash"))
+	mux.Handle("/test.dict", vcdiff.DictionaryHandler(html))
 
 	log := handlers.AccessLog(mux, nil)
 

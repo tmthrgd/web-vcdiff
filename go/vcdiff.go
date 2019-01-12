@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strings"
 
+	handlers "github.com/tmthrgd/httphandlers"
 	"github.com/tmthrgd/httputils"
 )
 
@@ -99,6 +100,10 @@ func Handler(h http.Handler, opts ...Option) http.Handler {
 
 		h.ServeHTTP(rw, r)
 	})
+}
+
+func DictionaryHandler(h http.Handler) http.Handler {
+	return handlers.AddHeader(h, "Vary", "Expect-Diff-Hash")
 }
 
 type config struct {
