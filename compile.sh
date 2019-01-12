@@ -17,7 +17,7 @@ EMCCFLAGS="$EMCCDEBUGFLAGS \
 	--source-map-base http://localhost:8090/"
 # -s DYNAMIC_EXECUTION=0
 
-rm -rf build
+rm -rf build open-vcdiff/build
 mkdir -p build/config
 
 (cd build && IDL_CHECKS=all python "$EMSCRIPTEN/tools/webidl_binder.py" ../vcddec.idl vcddec_glue)
@@ -46,3 +46,7 @@ emcc -o build/vcddec.html $EMCCFLAGS -std=c++17 \
 	-Iopen-vcdiff/src -Ibuild \
 	--post-js build/vcddec_glue.js \
 	build/libvcd{com,dec}.bc vcddec.cc
+
+mkdir -p open-vcdiff/build
+(cd open-vcdiff/build && cmake -Dvcdiff_build_exec=off -Dvcdiff_build_tests=off ..)
+(cd open-vcdiff/build && make)
