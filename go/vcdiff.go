@@ -1,8 +1,12 @@
 package vcdiff
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -17,8 +21,23 @@ func init() {
 	}
 }
 
-func Handler(h http.Handler) http.Handler {
+func Handler(h http.Handler, opts ...Option) http.Handler {
+	var c config
+	for _, opt := range opts {
+		opt(&c)
+	}
+
+	if c.dictionary == nil {
+		panic("open-vcdiff: missing one of WithDictionary, WithFixedDictionary or WithReadFixedDictionary")
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handleError := func(fmt string, err error) {
+			httputils.RequestLogf(r, fmt, err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError),
+				http.StatusInternalServerError)
+		}
+
 		hdr := w.Header()
 		hdr.Add("Vary", "Accept-Diff-Encoding")
 
@@ -27,12 +46,36 @@ func Handler(h http.Handler) http.Handler {
 			return
 		}
 
+		dict, dictURL, err := c.dictionary(r)
+		if err != nil {
+			handleError("dictionary callback failed: %v", err)
+			return
+		}
+
+		f, err := ioutil.TempFile("", "vcdiff-dict-")
+		if err == nil {
+			defer os.Remove(f.Name())
+			_, err = f.Write(dict)
+		}
+		if err == nil {
+			err = f.Close()
+		}
+		if err != nil {
+			handleError("writing dictionary temp file failed: %v", err)
+			return
+		}
+
+		digest := sha256.Sum256(dict)
+		dictURL = fmt.Sprintf("%s#%x", dictURL, digest[:6])
+
 		hdr.Set("Content-Diff-Encoding", "vcdiff")
-		hdr.Set("Content-Diff-Dictionary", "/test.dict#b47cc0f104b6")
+		hdr.Set("Content-Diff-Dictionary", dictURL)
 
 		dw := &responseWriter{
 			ResponseWriter: w,
 			req:            r,
+
+			dictPath: f.Name(),
 		}
 		defer func() {
 			dw.closeVCDIFF()
@@ -58,9 +101,40 @@ func Handler(h http.Handler) http.Handler {
 	})
 }
 
+type config struct {
+	dictionary func(*http.Request) ([]byte, string, error)
+}
+
+type Option func(*config)
+
+func WithReadFixedDictionary(dictionaryPath, dictionaryURL string) Option {
+	dict, err := ioutil.ReadFile(dictionaryPath)
+	return WithDictionary(func(*http.Request) ([]byte, string, error) {
+		return dict, dictionaryURL, err
+	})
+}
+
+func WithFixedDictionary(dictionary []byte, dictionaryURL string) Option {
+	return WithDictionary(func(*http.Request) ([]byte, string, error) {
+		return dictionary, dictionaryURL, nil
+	})
+}
+
+func WithDictionary(dictionary func(*http.Request) (dictionary []byte, dictionaryURL string, err error)) Option {
+	return func(c *config) {
+		if c.dictionary != nil {
+			panic("open-vcdiff: only one of WithDictionary, WithFixedDictionary or WithReadFixedDictionary may be specified")
+		}
+
+		c.dictionary = dictionary
+	}
+}
+
 type responseWriter struct {
 	http.ResponseWriter
 	req *http.Request
+
+	dictPath string
 
 	cmd   *exec.Cmd
 	stdin io.WriteCloser
@@ -100,7 +174,7 @@ func (rw *responseWriter) Write(p []byte) (int, error) {
 
 func (rw *responseWriter) startVCDIFF() {
 	cmd := exec.CommandContext(rw.req.Context(), vcdiffPath, "encode",
-		"-dictionary", "html/test.dict", "-interleaved")
+		"-dictionary", rw.dictPath, "-interleaved")
 	cmd.Stdout = rw.ResponseWriter
 	cmd.Stderr = logErrorWriter{rw.req}
 	rw.cmd = cmd
