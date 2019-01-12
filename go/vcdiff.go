@@ -3,24 +3,14 @@ package vcdiff
 import (
 	"crypto/sha256"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"os/exec"
 	"strings"
 
 	handlers "github.com/tmthrgd/httphandlers"
 	"github.com/tmthrgd/httputils"
+	openvcdiff "github.com/tmthrgd/web-vcdiff/go/internal/open-vcdiff"
 )
-
-var vcdiffPath, _ = exec.LookPath("vcdiff")
-
-func init() {
-	if vcdiffPath == "" {
-		vcdiffPath = "vcdiff"
-	}
-}
 
 func Handler(h http.Handler, opts ...Option) http.Handler {
 	var c config
@@ -29,7 +19,7 @@ func Handler(h http.Handler, opts ...Option) http.Handler {
 	}
 
 	if c.dictionary == nil {
-		panic("open-vcdiff: missing one of WithDictionary, WithFixedDictionary or WithReadFixedDictionary")
+		panic("web-vcdiff: missing one of WithDictionary, WithFixedDictionary or WithReadFixedDictionary")
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -53,19 +43,6 @@ func Handler(h http.Handler, opts ...Option) http.Handler {
 			return
 		}
 
-		f, err := ioutil.TempFile("", "vcdiff-dict-")
-		if err == nil {
-			defer os.Remove(f.Name())
-			_, err = f.Write(dict)
-		}
-		if err == nil {
-			err = f.Close()
-		}
-		if err != nil {
-			handleError("writing dictionary temp file failed: %v", err)
-			return
-		}
-
 		digest := sha256.Sum256(dict)
 		dictURL = fmt.Sprintf("%s#%x", dictURL, digest[:6])
 
@@ -76,7 +53,7 @@ func Handler(h http.Handler, opts ...Option) http.Handler {
 			ResponseWriter: w,
 			req:            r,
 
-			dictPath: f.Name(),
+			dictBytes: dict,
 		}
 		defer func() {
 			dw.closeVCDIFF()
@@ -128,7 +105,7 @@ func WithFixedDictionary(dictionary []byte, dictionaryURL string) Option {
 func WithDictionary(dictionary func(*http.Request) (dictionary []byte, dictionaryURL string, err error)) Option {
 	return func(c *config) {
 		if c.dictionary != nil {
-			panic("open-vcdiff: only one of WithDictionary, WithFixedDictionary or WithReadFixedDictionary may be specified")
+			panic("web-vcdiff: only one of WithDictionary, WithFixedDictionary or WithReadFixedDictionary may be specified")
 		}
 
 		c.dictionary = dictionary
@@ -139,11 +116,11 @@ type responseWriter struct {
 	http.ResponseWriter
 	req *http.Request
 
-	dictPath string
+	dictBytes []byte
 
-	cmd   *exec.Cmd
-	stdin io.WriteCloser
-	err   error
+	dict *openvcdiff.Dictionary
+	enc  *openvcdiff.Encoder
+	err  error
 
 	wroteHeader bool
 }
@@ -159,14 +136,14 @@ func (rw *responseWriter) WriteHeader(statusCode int) {
 }
 
 func (rw *responseWriter) Write(p []byte) (int, error) {
-	if rw.cmd == nil && rw.err == nil {
+	if rw.enc == nil && rw.err == nil {
 		rw.startVCDIFF()
 	}
 	if rw.err != nil {
 		return 0, rw.err
 	}
 
-	n, err := rw.stdin.Write(p)
+	n, err := rw.enc.Write(p)
 	if err != nil {
 		// We can't send an error response so bail here. For HTTP/2
 		// this will send a RST_STREAM frame.
@@ -178,20 +155,15 @@ func (rw *responseWriter) Write(p []byte) (int, error) {
 }
 
 func (rw *responseWriter) startVCDIFF() {
-	cmd := exec.CommandContext(rw.req.Context(), vcdiffPath, "encode",
-		"-dictionary", rw.dictPath, "-interleaved")
-	cmd.Stdout = rw.ResponseWriter
-	cmd.Stderr = logErrorWriter{rw.req}
-	rw.cmd = cmd
-
-	rw.stdin, rw.err = cmd.StdinPipe()
+	rw.dict, rw.err = openvcdiff.NewDictionary(rw.dictBytes)
 	if rw.err == nil {
-		rw.err = cmd.Start()
+		rw.enc, rw.err = openvcdiff.NewEncoder(rw.ResponseWriter, rw.dict,
+			openvcdiff.VCDFormatInterleaved)
 	}
 
 	if rw.err != nil && !rw.wroteHeader {
-		http.Error(rw.ResponseWriter, http.StatusText(http.StatusBadGateway),
-			http.StatusBadGateway)
+		http.Error(rw.ResponseWriter, http.StatusText(http.StatusInternalServerError),
+			http.StatusInternalServerError)
 	} else if rw.err != nil {
 		// We can't send an error response so bail here. For HTTP/2
 		// this will send a RST_STREAM frame.
@@ -200,32 +172,22 @@ func (rw *responseWriter) startVCDIFF() {
 }
 
 func (rw *responseWriter) closeVCDIFF() {
-	if rw.cmd == nil {
+	if rw.enc == nil {
 		return
 	}
 
-	closeErr := rw.stdin.Close()
+	closeErr := rw.enc.Close()
 	if rw.err == nil {
 		rw.err = closeErr
 	}
 
-	waitErr := rw.cmd.Wait()
-	if rw.err == nil {
-		rw.err = waitErr
-	}
+	rw.dict.Destroy()
 }
 
 func (rw *responseWriter) Flush() {
 	if f, ok := rw.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
-}
-
-type logErrorWriter struct{ r *http.Request }
-
-func (w logErrorWriter) Write(p []byte) (int, error) {
-	httputils.RequestLogf(w.r, "%s", p)
-	return len(p), nil
 }
 
 type (
