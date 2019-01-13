@@ -48,4 +48,4 @@ emcc -o build/vcddec.html $EMCCFLAGS -std=c++17 \
 	build/libvcd{com,dec}.bc vcddec.cc
 
 (cd build/open-vcdiff && cmake -Dvcdiff_build_exec=off -Dvcdiff_build_tests=off ../../open-vcdiff)
-(cd build/open-vcdiff && make)
+make -C build/open-vcdiff
