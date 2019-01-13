@@ -1,10 +1,7 @@
 #include <cstdlib>
 #include <google/vcencoder.h>
 
-extern "C" {
-#include "exports.h"
-
-extern void goOpenVCDIFFWriterWrite(int, const char *, size_t);
+extern "C" void goOpenVCDIFFWriterWrite(int, const char *, size_t);
 
 class OutputGo : public open_vcdiff::OutputStringInterface {
       public:
@@ -28,6 +25,9 @@ class OutputGo : public open_vcdiff::OutputStringInterface {
 	int writer_idx_;
 	size_t size_;
 };
+
+extern "C" {
+#include "exports.h"
 
 HashedDictionaryPtr NewHashedDictionary(const char *dictionary_contents,
                                         size_t dictionary_size) {
