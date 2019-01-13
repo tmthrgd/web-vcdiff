@@ -135,7 +135,7 @@ func (m *writersMap) insert(w io.Writer) *writer {
 		idx := m.idx
 		m.idx++
 
-		if _, ok := writers.m[idx]; !ok {
+		if _, ok := m.m[idx]; !ok {
 			w := &writer{w, nil, idx}
 			m.m[idx] = w
 			return w
