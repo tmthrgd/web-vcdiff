@@ -59,45 +59,42 @@ func (d *Dictionary) Destroy() {
 type Encoder struct {
 	ptr C.VCDiffStreamingEncoderPtr
 
-	writerIdx int
+	w *writer
 }
 
 func NewEncoder(w io.Writer, dict *Dictionary, flags FormatFlags) (*Encoder, error) {
-	writerIdx := writers.insert(w)
+	ww := writers.insert(w)
 
 	ptr := C.NewVCDiffStreamingEncoder(dict.cPtr(),
 		C.int(flags&^VCDLookForTargetMatches),
 		C.int(flags&VCDLookForTargetMatches),
-		C.int(writerIdx))
+		C.int(ww.idx))
 	if ptr == nil {
-		writers.delete(writerIdx)
+		writers.delete(ww)
 		return nil, errors.New("open-vcdiff: failed to start encoder")
 	}
 
-	return &Encoder{ptr, writerIdx}, nil
+	return &Encoder{ptr, ww}, nil
 }
 
 func (e *Encoder) Write(p []byte) (int, error) {
 	if e.ptr == nil {
 		return 0, errors.New("open-vcdiff: cannot write to Encoder after Close")
 	}
-
-	w := writers.find(e.writerIdx)
-	if w.err != nil {
-		return 0, w.err
+	if e.w.err != nil {
+		return 0, e.w.err
 	}
-
 	if len(p) == 0 {
 		// We want to return an error, even for a zero-length Write.
 		return 0, nil
 	}
 
-	if C.VCDiffStreamingEncoderEncodeChunk(e.ptr, C.int(e.writerIdx),
+	if C.VCDiffStreamingEncoderEncodeChunk(e.ptr, C.int(e.w.idx),
 		(*C.char)(unsafe.Pointer(&p[0])), C.ulong(len(p))) != 1 {
 		return 0, errors.New("open-vcdiff: failed to encode chunk")
 	}
 
-	return len(p), w.err
+	return len(p), e.w.err
 }
 
 func (e *Encoder) Close() error {
@@ -105,30 +102,33 @@ func (e *Encoder) Close() error {
 		return nil
 	}
 
-	ok := C.VCDiffStreamingEncoderFinishEncoding(e.ptr, C.int(e.writerIdx))
+	ok := C.VCDiffStreamingEncoderFinishEncoding(e.ptr, C.int(e.w.idx))
 	e.ptr = nil
 
-	w := writers.delete(e.writerIdx)
+	writers.delete(e.w)
 
 	if ok != 1 {
 		return errors.New("open-vcdiff: failed to finish encoding")
 	}
 
-	return w.err
+	return e.w.err
 }
 
 type writer struct {
 	io.Writer
 	err error
-}
 
-type writersMap struct {
-	mu  sync.RWMutex
-	m   map[int]*writer
 	idx int
 }
 
-func (m *writersMap) insert(w io.Writer) int {
+type writersMap struct {
+	mu sync.RWMutex
+	m  map[int]*writer
+
+	idx int
+}
+
+func (m *writersMap) insert(w io.Writer) *writer {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for tries := 0; ; tries++ {
@@ -136,8 +136,9 @@ func (m *writersMap) insert(w io.Writer) int {
 		m.idx++
 
 		if _, ok := writers.m[idx]; !ok {
-			m.m[idx] = &writer{Writer: w}
-			return idx
+			w := &writer{w, nil, idx}
+			m.m[idx] = w
+			return w
 		}
 		if tries > 100 {
 			panic("open-vcdiff: cannot find free slot in writersMap")
@@ -152,12 +153,10 @@ func (m *writersMap) find(idx int) *writer {
 	return w
 }
 
-func (m *writersMap) delete(idx int) *writer {
+func (m *writersMap) delete(w *writer) {
 	m.mu.Lock()
-	w := m.m[idx]
-	delete(m.m, idx)
+	delete(m.m, w.idx)
 	m.mu.Unlock()
-	return w
 }
 
 var writers = writersMap{m: make(map[int]*writer)}
