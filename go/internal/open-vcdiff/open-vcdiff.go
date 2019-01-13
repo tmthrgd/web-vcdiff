@@ -3,7 +3,6 @@ package openvcdiff
 // #cgo LDFLAGS: -L${SRCDIR}/../../../open-vcdiff/build -lvcdenc -lvcdcom
 // #cgo CPPFLAGS: -I${SRCDIR}/../../../open-vcdiff/src
 // #include "exports.h"
-// #include <stdlib.h>
 import "C"
 
 import (
@@ -29,10 +28,12 @@ type Dictionary struct {
 }
 
 func NewDictionary(dict []byte) (*Dictionary, error) {
-	dictPtr := C.CBytes(dict)
-	defer C.free(dictPtr)
+	var dictPtr *byte
+	if len(dict) > 0 {
+		dictPtr = &dict[0]
+	}
 
-	ptr := C.NewHashedDictionary((*C.char)(dictPtr), C.ulong(len(dict)))
+	ptr := C.NewHashedDictionary((*C.char)(unsafe.Pointer(dictPtr)), C.ulong(len(dict)))
 	if ptr == nil {
 		return nil, errors.New("open-vcdiff: failed to initialise dictionary")
 	}
@@ -81,15 +82,18 @@ func (e *Encoder) Write(p []byte) (int, error) {
 		return 0, errors.New("open-vcdiff: cannot write to Encoder after Close")
 	}
 
-	ptr := C.CBytes(p)
-	defer C.free(ptr)
-
 	w := writers.find(e.writerIdx)
 	if w.err != nil {
 		return 0, w.err
 	}
 
-	if C.VCDiffStreamingEncoderEncodeChunk(e.ptr, C.int(e.writerIdx), (*C.char)(ptr), C.ulong(len(p))) != 1 {
+	if len(p) == 0 {
+		// We want to return an error, even for a zero-length Write.
+		return 0, nil
+	}
+
+	if C.VCDiffStreamingEncoderEncodeChunk(e.ptr, C.int(e.writerIdx),
+		(*C.char)(unsafe.Pointer(&p[0])), C.ulong(len(p))) != 1 {
 		return 0, errors.New("open-vcdiff: failed to encode chunk")
 	}
 
