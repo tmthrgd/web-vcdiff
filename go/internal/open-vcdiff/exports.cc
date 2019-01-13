@@ -23,7 +23,7 @@ class OutputGo : public open_vcdiff::OutputStringInterface {
 
       private:
 	int writer_idx_;
-	size_t size_;
+	size_t size_ = 0;
 };
 
 extern "C" {
