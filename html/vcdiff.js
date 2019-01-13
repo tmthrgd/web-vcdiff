@@ -8,7 +8,7 @@ const m = new Promise(resolve => {
 	Module().then(Module => resolve({ Module }));
 });
 
-const decodeStream = (resp, dict) => new ReadableStream({
+const decodeStream = (body, dict) => new ReadableStream({
 	async start(controller) {
 		const dec = new Decoder((await m).Module, {
 			append(data) {
@@ -18,7 +18,7 @@ const decodeStream = (resp, dict) => new ReadableStream({
 		try {
 			dec.start(await dict);
 
-			const reader = resp.body.getReader();
+			const reader = body.getReader();
 			for (; ;) {
 				const { done, value } = await reader.read();
 				if (done) {
@@ -37,7 +37,7 @@ const decodeStream = (resp, dict) => new ReadableStream({
 	},
 
 	cancel(reason) {
-		resp.body && resp.body.cancel(reason);
+		body.cancel(reason);
 	},
 });
 
@@ -121,7 +121,7 @@ const decode = async resp => {
 	}
 
 	const dict = loadDict(dictHdr).then(asUint8Array);
-	const body = resp.body ? decodeStream(resp, dict) : await decodeBuffer(resp, dict);
+	const body = resp.body ? decodeStream(resp.body, dict) : await decodeBuffer(resp, dict);
 
 	resp = new Response(body, resp);
 	resp.headers.delete('Content-Diff-Encoding');
