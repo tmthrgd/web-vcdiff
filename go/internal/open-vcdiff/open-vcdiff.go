@@ -1,6 +1,6 @@
 package openvcdiff
 
-// #cgo LDFLAGS: -L${SRCDIR}/../../../open-vcdiff/build -lvcdenc -lvcdcom
+// #cgo LDFLAGS: -L${SRCDIR}/../../../build/open-vcdiff -lvcdenc -lvcdcom
 // #cgo CPPFLAGS: -I${SRCDIR}/../../../open-vcdiff/src
 // #include "exports.h"
 import "C"
