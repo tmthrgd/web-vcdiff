@@ -23,12 +23,6 @@ func Handler(h http.Handler, opts ...Option) http.Handler {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		handleError := func(fmt string, err error) {
-			httputils.RequestLogf(r, fmt, err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError),
-				http.StatusInternalServerError)
-		}
-
 		hdr := w.Header()
 		hdr.Add("Vary", "Accept-Diff-Encoding")
 
@@ -39,7 +33,9 @@ func Handler(h http.Handler, opts ...Option) http.Handler {
 
 		dict, dictURL, err := c.dictionary(r)
 		if err != nil {
-			handleError("dictionary callback failed: %v", err)
+			httputils.RequestLogf(r, "dictionary callback failed: %v", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError),
+				http.StatusInternalServerError)
 			return
 		}
 
