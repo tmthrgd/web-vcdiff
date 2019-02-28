@@ -42,6 +42,8 @@ const decodeStream = (body, dict) => new ReadableStream({
 });
 
 const decodeBuffer = async (resp, dict) => {
+	const respBody = asUint8Array(resp);
+
 	let body = new Uint8Array(0);
 	let pos = 0;
 	const reserve = n => {
@@ -65,7 +67,7 @@ const decodeBuffer = async (resp, dict) => {
 	});
 	try {
 		dec.start(await dict);
-		dec.decode(await asUint8Array(resp));
+		dec.decode(await respBody);
 		dec.finish();
 	} finally {
 		dec.destroy();
