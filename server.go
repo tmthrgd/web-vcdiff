@@ -23,7 +23,6 @@ func main() {
 
 	root := http.FileServer(http.Dir(""))
 	mux.Handle("/open-vcdiff/", root)
-	mux.Handle("/output_string.h", root)
 	mux.Handle("/build/vcddec_glue.cpp", root)
 
 	if dir := os.Getenv("EMSCRIPTEN"); dir != "" {
