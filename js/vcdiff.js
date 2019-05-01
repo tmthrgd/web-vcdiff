@@ -5,7 +5,16 @@ const asUint8Array = async resp => new Uint8Array(await resp.arrayBuffer());
 
 const m = new Promise(resolve => {
 	// See github.com/kripken/emscripten/issues/5820.
-	Module().then(Module => resolve({ Module }));
+	Module({
+		locateFile(path, scriptDirectory) {
+			// path will be vcddec.wasm and import.meta.url
+			// is the url of the current module. By using
+			// URL we can convert the relative path into an
+			// absolute URL so that the wasm file doesn't
+			// need to be stored at the root.
+			return new URL(path, import.meta.url).href;
+		},
+	}).then(Module => resolve({ Module }));
 });
 
 const decodeStream = (body, dict) => new ReadableStream({
