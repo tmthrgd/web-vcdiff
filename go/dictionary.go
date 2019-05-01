@@ -117,6 +117,7 @@ func DictionaryHandler(d Dictionaries) http.Handler {
 		hdr.Set("Content-Type", "application/octet-stream")
 		hdr.Set("Content-Length", strconv.Itoa(len(dict.Data)))
 		hdr.Set("Cache-Control", "public, max-age=31536000, immutable")
+		hdr.Set("Last-Modified", "Mon, 01 Jan 2001 01:00:00 GMT")
 
 		w.Write(dict.Data)
 	}))
