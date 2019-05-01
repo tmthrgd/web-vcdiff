@@ -78,9 +78,9 @@ const decodeBuffer = async (resp, dict) => {
 
 const dictionaryHandlerPath = '/.well-known/web-vcdiff/d/';
 
-const loadDict = async header => {
+const loadDict = async (header, base) => {
 	const req = new Request(
-		new URL(dictionaryHandlerPath + header, location),
+		new URL(dictionaryHandlerPath + header, base),
 		{ cache: 'force-cache' });
 
 	const resp = await fetch(req);
@@ -102,7 +102,7 @@ const decode = async resp => {
 		throw new Error('missing Content-Diff-Dictionary header for ' + resp.url);
 	}
 
-	const dict = loadDict(dictHdr);
+	const dict = loadDict(dictHdr, resp.url);
 	const body = resp.body ? decodeStream(resp.body, dict) : await decodeBuffer(resp, dict);
 
 	resp = new Response(body, resp);
