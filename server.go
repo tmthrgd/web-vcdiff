@@ -49,8 +49,8 @@ func main() {
 	mux.Handle("/", html)
 	mux.Handle("/test.txt", vcdiff.Handler(ds, html))
 
-	log := handlers.AccessLog(mux, nil)
+	logH := handlers.AccessLog(mux, nil)
 
 	fmt.Printf("Listening on %s\n", *addr)
-	panic(http.ListenAndServe(*addr, log))
+	log.Fatal(http.ListenAndServe(*addr, logH))
 }
