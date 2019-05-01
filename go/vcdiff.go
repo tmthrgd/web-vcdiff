@@ -2,10 +2,10 @@ package vcdiff
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/tmthrgd/httputils"
 	openvcdiff "github.com/tmthrgd/web-vcdiff/go/internal/open-vcdiff"
+	"golang.org/x/net/http/httpguts"
 )
 
 func Handler(d Dictionaries, h http.Handler) http.Handler {
@@ -13,7 +13,7 @@ func Handler(d Dictionaries, h http.Handler) http.Handler {
 		hdr := w.Header()
 		hdr.Add("Vary", "Accept-Diff-Encoding")
 
-		if !strings.EqualFold(r.Header.Get("Accept-Diff-Encoding"), "vcdiff") {
+		if !httpguts.HeaderValuesContainsToken(r.Header["Accept-Diff-Encoding"], "vcdiff") {
 			h.ServeHTTP(w, r)
 			return
 		}
