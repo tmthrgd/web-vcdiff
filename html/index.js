@@ -12,5 +12,3 @@ vcdiff.fetch('/test.txt')
 	.then(must200)
 	.then(resp => resp.text())
 	.then(console.log, console.error);
-
-window.flushCache = vcdiff.flushCache;

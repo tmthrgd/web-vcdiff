@@ -78,35 +78,17 @@ const decodeBuffer = async (resp, dict) => {
 
 const dictionaryHandlerPath = '/.well-known/web-vcdiff/d/';
 
-const dictCache = caches.open('vcdiff-dict');
-
 const loadDict = async header => {
-	const cache = await dictCache;
-
 	const req = new Request(
 		new URL(dictionaryHandlerPath + header, location),
-		{ cache: 'no-store' });
-
-	const entry = await cache.match(req);
-	if (entry) {
-		return entry;
-	}
+		{ cache: 'force-cache' });
 
 	const resp = await fetch(req);
 	if (!resp.ok) {
 		throw new Error('failed to load ' + resp.url + ': ' + resp.statusText);
 	}
 
-	cache.put(req, resp.clone()).catch(err => {
-		console.error('failed to store dictionary in cache:', err);
-	});
-	return resp;
-};
-
-const flushCache = async () => {
-	const cache = await dictCache;
-	const keys = await cache.keys();
-	await Promise.all(keys.map(req => cache.delete(req)));
+	return await asUint8Array(resp);
 };
 
 const decode = async resp => {
@@ -120,7 +102,7 @@ const decode = async resp => {
 		throw new Error('missing Content-Diff-Dictionary header for ' + resp.url);
 	}
 
-	const dict = loadDict(dictHdr).then(asUint8Array);
+	const dict = loadDict(dictHdr);
 	const body = resp.body ? decodeStream(resp.body, dict) : await decodeBuffer(resp, dict);
 
 	resp = new Response(body, resp);
@@ -137,4 +119,4 @@ const request = (input, init) => {
 
 const vcdiffFetch = (input, init) => fetch(request(input, init)).then(decode);
 
-export { request, decode, vcdiffFetch as fetch, flushCache };
+export { request, decode, vcdiffFetch as fetch };
