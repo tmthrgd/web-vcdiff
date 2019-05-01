@@ -105,10 +105,7 @@ func (rw *responseWriter) Write(p []byte) (int, error) {
 	}
 
 	n, err := rw.enc.Write(p)
-	if err != nil {
-		rw.err = err
-	}
-
+	rw.err = err
 	return n, err
 }
 
