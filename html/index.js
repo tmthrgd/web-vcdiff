@@ -11,4 +11,7 @@ const must200 = resp => {
 vcdiff.fetch('/test.txt')
 	.then(must200)
 	.then(resp => resp.text())
-	.then(console.log, console.error);
+	.then(body => {
+		document.querySelector('.output').innerText = body;
+	})
+	.catch(console.error);
