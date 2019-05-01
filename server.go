@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -31,11 +32,18 @@ func main() {
 			http.FileServer(http.Dir(dir))))
 	}
 
+	d, err := vcdiff.ReadDictionary("html/test.dict")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ds := vcdiff.FixedDictionary(d)
+	mux.Handle(vcdiff.DictionaryHandlerPath,
+		vcdiff.DictionaryHandler(ds))
+
 	html := http.FileServer(http.Dir("html"))
 	mux.Handle("/", html)
-	mux.Handle("/test.txt", vcdiff.Handler(html,
-		vcdiff.WithReadFixedDictionary("html/test.dict", "/test.dict")))
-	mux.Handle("/test.dict", vcdiff.DictionaryHandler(html))
+	mux.Handle("/test.txt", vcdiff.Handler(ds, html))
 
 	log := handlers.AccessLog(mux, nil)
 

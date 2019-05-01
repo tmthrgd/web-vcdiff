@@ -76,18 +76,16 @@ const decodeBuffer = async (resp, dict) => {
 	return body.subarray(0, pos);
 };
 
+const dictionaryHandlerPath = '/.well-known/web-vcdiff/d/';
+
 const dictCache = caches.open('vcdiff-dict');
 
 const loadDict = async header => {
 	const cache = await dictCache;
 
-	const url = new URL(header, location);
-	const hash = url.hash && url.hash.slice(1);
-	url.hash = '';
-	const req = new Request(url, {
-		cache: 'no-store',
-		headers: hash ? { 'Expect-Diff-Hash': hash } : {},
-	});
+	const req = new Request(
+		new URL(dictionaryHandlerPath + header, location),
+		{ cache: 'no-store' });
 
 	const entry = await cache.match(req);
 	if (entry) {

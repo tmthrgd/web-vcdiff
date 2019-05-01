@@ -1,27 +1,14 @@
 package vcdiff
 
 import (
-	"crypto/sha256"
-	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strings"
 
-	handlers "github.com/tmthrgd/httphandlers"
 	"github.com/tmthrgd/httputils"
 	openvcdiff "github.com/tmthrgd/web-vcdiff/go/internal/open-vcdiff"
 )
 
-func Handler(h http.Handler, opts ...Option) http.Handler {
-	var c config
-	for _, opt := range opts {
-		opt(&c)
-	}
-
-	if c.dictionary == nil {
-		panic("web-vcdiff: missing one of WithDictionary, WithFixedDictionary or WithReadFixedDictionary")
-	}
-
+func Handler(d Dictionaries, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hdr := w.Header()
 		hdr.Add("Vary", "Accept-Diff-Encoding")
@@ -31,7 +18,7 @@ func Handler(h http.Handler, opts ...Option) http.Handler {
 			return
 		}
 
-		dict, dictURL, err := c.dictionary(r)
+		dict, err := d.Select(r)
 		if err != nil {
 			httputils.RequestLogf(r, "dictionary callback failed: %v", err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError),
@@ -39,17 +26,16 @@ func Handler(h http.Handler, opts ...Option) http.Handler {
 			return
 		}
 
-		digest := sha256.Sum256(dict)
-		dictURL = fmt.Sprintf("%s#%x", dictURL, digest[:6])
+		dict.checkValid()
 
 		hdr.Set("Content-Diff-Encoding", "vcdiff")
-		hdr.Set("Content-Diff-Dictionary", dictURL)
+		hdr.Set("Content-Diff-Dictionary", dict.ID.encode())
 
 		dw := &responseWriter{
 			ResponseWriter: w,
 			req:            r,
 
-			dictBytes: dict,
+			dictBytes: dict.Data,
 		}
 		defer func() {
 			dw.closeVCDIFF()
@@ -73,39 +59,6 @@ func Handler(h http.Handler, opts ...Option) http.Handler {
 
 		h.ServeHTTP(rw, r)
 	})
-}
-
-func DictionaryHandler(h http.Handler) http.Handler {
-	return handlers.AddHeader(h, "Vary", "Expect-Diff-Hash")
-}
-
-type config struct {
-	dictionary func(*http.Request) ([]byte, string, error)
-}
-
-type Option func(*config)
-
-func WithReadFixedDictionary(dictionaryPath, dictionaryURL string) Option {
-	dict, err := ioutil.ReadFile(dictionaryPath)
-	return WithDictionary(func(*http.Request) ([]byte, string, error) {
-		return dict, dictionaryURL, err
-	})
-}
-
-func WithFixedDictionary(dictionary []byte, dictionaryURL string) Option {
-	return WithDictionary(func(*http.Request) ([]byte, string, error) {
-		return dictionary, dictionaryURL, nil
-	})
-}
-
-func WithDictionary(dictionary func(*http.Request) (dictionary []byte, dictionaryURL string, err error)) Option {
-	return func(c *config) {
-		if c.dictionary != nil {
-			panic("web-vcdiff: only one of WithDictionary, WithFixedDictionary or WithReadFixedDictionary may be specified")
-		}
-
-		c.dictionary = dictionary
-	}
 }
 
 type responseWriter struct {
