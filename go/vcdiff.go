@@ -26,7 +26,9 @@ func Handler(d Dictionaries, h http.Handler) http.Handler {
 			return
 		}
 
-		dict.checkValid()
+		if dict.ID != newDictionaryID(dict.Data) {
+			panic("vcdiff: invalid dictionary identifier")
+		}
 
 		hdr.Set("Content-Diff-Encoding", "vcdiff")
 		hdr.Set("Content-Diff-Dictionary", dict.ID.encode())

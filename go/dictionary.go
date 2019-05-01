@@ -61,12 +61,6 @@ func ReadDictionary(path string) (*Dictionary, error) {
 	return NewDictionary(data), nil
 }
 
-func (d *Dictionary) checkValid() {
-	if d.ID != newDictionaryID(d.Data) {
-		panic("vcdiff: invalid dictionary identifier")
-	}
-}
-
 type Dictionaries interface {
 	Select(*http.Request) (*Dictionary, error)
 	Find(context.Context, DictionaryID) (*Dictionary, error)
@@ -112,7 +106,9 @@ func DictionaryHandler(d Dictionaries) http.Handler {
 			return
 		}
 
-		dict.checkValid()
+		if dict.ID != id || dict.ID != newDictionaryID(dict.Data) {
+			panic("vcdiff: invalid dictionary identifier")
+		}
 
 		hdr := w.Header()
 		hdr.Set("Content-Type", "application/octet-stream")
