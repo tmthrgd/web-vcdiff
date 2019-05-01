@@ -10,6 +10,7 @@ interface OutputJS {
 [Prefix="open_vcdiff::"]
 interface VCDiffStreamingDecoder {
 	void VCDiffStreamingDecoder();
+	boolean SetMaximumTargetFileSize(unsigned long new_maximum_target_file_size);
 	void StartDecoding([Const] DOMString dictionary_ptr, unsigned long dictionary_size);
 	boolean DecodeChunkToInterface([Const] DOMString data, unsigned long len, OutputJS output);
 	boolean FinishDecoding();

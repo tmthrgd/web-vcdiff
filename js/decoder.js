@@ -22,7 +22,9 @@ export default class {
 		}
 
 		this._m = m;
+
 		this._dec = new m.VCDiffStreamingDecoder();
+		this._dec.SetMaximumTargetFileSize(0x7fffffff);
 
 		const out = new m.OutputJS();
 		out.appendCallback = (s, n) => {
