@@ -85,26 +85,23 @@ func (rw *responseWriter) WriteHeader(statusCode int) {
 }
 
 func (rw *responseWriter) Write(p []byte) (int, error) {
-	if rw.enc == nil && rw.err == nil {
-		rw.startVCDIFF()
-	}
-	if rw.err != nil {
-		return 0, rw.err
-	}
-	if !rw.wroteHeader {
+	if !rw.wroteHeader && rw.err == nil {
 		if rw.Header().Get("Content-Type") == "" {
 			rw.Header().Set("Content-Type", http.DetectContentType(p))
 		}
 
 		rw.WriteHeader(http.StatusOK)
 	}
+	if rw.enc == nil && rw.err == nil {
+		rw.startVCDIFF()
+	}
+	if rw.err != nil {
+		return 0, rw.err
+	}
 
 	n, err := rw.enc.Write(p)
 	if err != nil {
-		// We can't send an error response so bail here. For HTTP/2
-		// this will send a RST_STREAM frame.
 		rw.err = err
-		panic(http.ErrAbortHandler)
 	}
 
 	return n, err
@@ -112,19 +109,12 @@ func (rw *responseWriter) Write(p []byte) (int, error) {
 
 func (rw *responseWriter) startVCDIFF() {
 	rw.dict, rw.err = openvcdiff.NewDictionary(rw.dictBytes)
-	if rw.err == nil {
-		rw.enc, rw.err = openvcdiff.NewEncoder(rw.ResponseWriter, rw.dict,
-			openvcdiff.VCDFormatInterleaved)
+	if rw.err != nil {
+		return
 	}
 
-	if rw.err != nil && !rw.wroteHeader {
-		http.Error(rw.ResponseWriter, http.StatusText(http.StatusInternalServerError),
-			http.StatusInternalServerError)
-	} else if rw.err != nil {
-		// We can't send an error response so bail here. For HTTP/2
-		// this will send a RST_STREAM frame.
-		panic(http.ErrAbortHandler)
-	}
+	rw.enc, rw.err = openvcdiff.NewEncoder(rw.ResponseWriter, rw.dict,
+		openvcdiff.VCDFormatInterleaved)
 }
 
 func (rw *responseWriter) closeVCDIFF() {
