@@ -91,6 +91,13 @@ func (rw *responseWriter) Write(p []byte) (int, error) {
 	if rw.err != nil {
 		return 0, rw.err
 	}
+	if !rw.wroteHeader {
+		if rw.Header().Get("Content-Type") == "" {
+			rw.Header().Set("Content-Type", http.DetectContentType(p))
+		}
+
+		rw.WriteHeader(http.StatusOK)
+	}
 
 	n, err := rw.enc.Write(p)
 	if err != nil {
