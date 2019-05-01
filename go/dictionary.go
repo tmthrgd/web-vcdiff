@@ -89,13 +89,9 @@ const DictionaryHandlerPath = "/.well-known/web-vcdiff/d/"
 
 func DictionaryHandler(d Dictionaries) http.Handler {
 	return handlers.NeverModified(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, DictionaryHandlerPath) {
-			http.NotFound(w, r)
-			return
-		}
-
 		var id DictionaryID
-		if !id.decode(r.URL.Path[len(DictionaryHandlerPath):]) {
+		if !strings.HasPrefix(r.URL.Path, DictionaryHandlerPath) ||
+			!id.decode(r.URL.Path[len(DictionaryHandlerPath):]) {
 			http.NotFound(w, r)
 			return
 		}
