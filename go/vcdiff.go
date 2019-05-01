@@ -2,14 +2,17 @@ package vcdiff
 
 import (
 	"crypto/sha256"
-	"fmt"
+	"encoding/hex"
+	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"strings"
 
-	handlers "github.com/tmthrgd/httphandlers"
 	"github.com/tmthrgd/httputils"
 	openvcdiff "github.com/tmthrgd/web-vcdiff/go/internal/open-vcdiff"
+	"golang.org/x/net/http/httpguts"
 )
 
 func Handler(h http.Handler, opts ...Option) http.Handler {
@@ -24,14 +27,14 @@ func Handler(h http.Handler, opts ...Option) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hdr := w.Header()
-		hdr.Add("Vary", "Accept-Diff-Encoding")
+		hdr.Add("Vary", "Accept-Diff-Encoding, Accept-Diff-Dictionaries")
 
 		if !strings.EqualFold(r.Header.Get("Accept-Diff-Encoding"), "vcdiff") {
 			h.ServeHTTP(w, r)
 			return
 		}
 
-		dict, dictURL, err := c.dictionary(r)
+		dict, err := c.dictionary(r)
 		if err != nil {
 			httputils.RequestLogf(r, "dictionary callback failed: %v", err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError),
@@ -39,15 +42,11 @@ func Handler(h http.Handler, opts ...Option) http.Handler {
 			return
 		}
 
-		digest := sha256.Sum256(dict)
-		dictURL = fmt.Sprintf("%s#%x", dictURL, digest[:6])
-
-		hdr.Set("Content-Diff-Encoding", "vcdiff")
-		hdr.Set("Content-Diff-Dictionary", dictURL)
-
 		dw := &responseWriter{
-			ResponseWriter: w,
-			req:            r,
+			rw:  w,
+			req: r,
+
+			bw: w,
 
 			dictBytes: dict,
 		}
@@ -75,30 +74,26 @@ func Handler(h http.Handler, opts ...Option) http.Handler {
 	})
 }
 
-func DictionaryHandler(h http.Handler) http.Handler {
-	return handlers.AddHeader(h, "Vary", "Expect-Diff-Hash")
-}
-
 type config struct {
-	dictionary func(*http.Request) ([]byte, string, error)
+	dictionary func(*http.Request) ([]byte, error)
 }
 
 type Option func(*config)
 
-func WithReadFixedDictionary(dictionaryPath, dictionaryURL string) Option {
+func WithReadFixedDictionary(dictionaryPath string) Option {
 	dict, err := ioutil.ReadFile(dictionaryPath)
-	return WithDictionary(func(*http.Request) ([]byte, string, error) {
-		return dict, dictionaryURL, err
+	return WithDictionary(func(*http.Request) ([]byte, error) {
+		return dict, err
 	})
 }
 
-func WithFixedDictionary(dictionary []byte, dictionaryURL string) Option {
-	return WithDictionary(func(*http.Request) ([]byte, string, error) {
-		return dictionary, dictionaryURL, nil
+func WithFixedDictionary(dictionary []byte) Option {
+	return WithDictionary(func(*http.Request) ([]byte, error) {
+		return dictionary, nil
 	})
 }
 
-func WithDictionary(dictionary func(*http.Request) (dictionary []byte, dictionaryURL string, err error)) Option {
+func WithDictionary(dictionary func(*http.Request) (dictionary []byte, err error)) Option {
 	return func(c *config) {
 		if c.dictionary != nil {
 			panic("web-vcdiff: only one of WithDictionary, WithFixedDictionary or WithReadFixedDictionary may be specified")
@@ -109,8 +104,11 @@ func WithDictionary(dictionary func(*http.Request) (dictionary []byte, dictionar
 }
 
 type responseWriter struct {
-	http.ResponseWriter
+	rw  http.ResponseWriter
 	req *http.Request
+
+	mw *multipart.Writer
+	bw io.Writer
 
 	dictBytes []byte
 
@@ -121,17 +119,65 @@ type responseWriter struct {
 	wroteHeader bool
 }
 
+func (rw *responseWriter) Header() http.Header {
+	return rw.rw.Header()
+}
+
 func (rw *responseWriter) WriteHeader(statusCode int) {
 	if rw.err != nil || rw.wroteHeader {
 		return
 	}
 	rw.wroteHeader = true
 
-	rw.Header().Del("Content-Length")
-	rw.ResponseWriter.WriteHeader(statusCode)
+	digest := sha256.Sum256(rw.dictBytes)
+	hexDigest := hex.EncodeToString(digest[:8])
+
+	hdr := rw.Header()
+	hdr.Del("Content-Length")
+	hdr.Del("Etag")
+
+	if !bodyAllowedForStatus(statusCode) ||
+		httpguts.HeaderValuesContainsToken(
+			rw.req.Header["Accept-Diff-Dictionaries"], hexDigest) {
+		hdr.Set("Content-Diff-Encoding", "vcdiff:"+hexDigest)
+
+		rw.rw.WriteHeader(statusCode)
+		return
+	}
+
+	rw.mw = multipart.NewWriter(rw.rw)
+
+	cts := hdr["Content-Type"]
+	hdr.Set("Content-Type", rw.mw.FormDataContentType())
+
+	hdr.Set("Content-Diff-Encoding", "vcdiff:*"+hexDigest)
+
+	rw.rw.WriteHeader(statusCode)
+
+	pw, err := rw.mw.CreatePart(textproto.MIMEHeader{
+		"Content-Type":        {"application/octet-stream"},
+		"Content-Disposition": {`form-data; name=dict; filename=d`},
+	})
+	if err != nil {
+		return
+	}
+
+	_, rw.err = pw.Write(rw.dictBytes)
+	if rw.err != nil {
+		return
+	}
+
+	rw.bw, rw.err = rw.mw.CreatePart(textproto.MIMEHeader{
+		"Content-Type":        cts,
+		"Content-Disposition": {`form-data; name=body; filename=b`},
+	})
 }
 
 func (rw *responseWriter) Write(p []byte) (int, error) {
+	if !rw.wroteHeader {
+		rw.WriteHeader(http.StatusOK)
+	}
+
 	if rw.enc == nil && rw.err == nil {
 		rw.startVCDIFF()
 	}
@@ -141,10 +187,7 @@ func (rw *responseWriter) Write(p []byte) (int, error) {
 
 	n, err := rw.enc.Write(p)
 	if err != nil {
-		// We can't send an error response so bail here. For HTTP/2
-		// this will send a RST_STREAM frame.
 		rw.err = err
-		panic(http.ErrAbortHandler)
 	}
 
 	return n, err
@@ -152,36 +195,34 @@ func (rw *responseWriter) Write(p []byte) (int, error) {
 
 func (rw *responseWriter) startVCDIFF() {
 	rw.dict, rw.err = openvcdiff.NewDictionary(rw.dictBytes)
-	if rw.err == nil {
-		rw.enc, rw.err = openvcdiff.NewEncoder(rw.ResponseWriter, rw.dict,
-			openvcdiff.VCDFormatInterleaved)
-	}
-
-	if rw.err != nil && !rw.wroteHeader {
-		http.Error(rw.ResponseWriter, http.StatusText(http.StatusInternalServerError),
-			http.StatusInternalServerError)
-	} else if rw.err != nil {
-		// We can't send an error response so bail here. For HTTP/2
-		// this will send a RST_STREAM frame.
-		panic(http.ErrAbortHandler)
-	}
-}
-
-func (rw *responseWriter) closeVCDIFF() {
-	if rw.enc == nil {
+	if rw.err != nil {
 		return
 	}
 
-	closeErr := rw.enc.Close()
-	if rw.err == nil {
-		rw.err = closeErr
+	rw.enc, rw.err = openvcdiff.NewEncoder(rw.bw, rw.dict,
+		openvcdiff.VCDFormatInterleaved)
+}
+
+func (rw *responseWriter) closeVCDIFF() {
+	if rw.enc != nil {
+		closeErr := rw.enc.Close()
+		if rw.err == nil {
+			rw.err = closeErr
+		}
+
+		rw.dict.Destroy()
 	}
 
-	rw.dict.Destroy()
+	if rw.mw != nil {
+		closeErr := rw.mw.Close()
+		if rw.err == nil {
+			rw.err = closeErr
+		}
+	}
 }
 
 func (rw *responseWriter) Flush() {
-	if f, ok := rw.ResponseWriter.(http.Flusher); ok {
+	if f, ok := rw.rw.(http.Flusher); ok {
 		f.Flush()
 	}
 }
@@ -202,17 +243,17 @@ var (
 )
 
 func (w closeNotifyResponseWriter) CloseNotify() <-chan bool {
-	return w.ResponseWriter.(http.CloseNotifier).CloseNotify()
+	return w.rw.(http.CloseNotifier).CloseNotify()
 }
 
 func (w closeNotifyPusherResponseWriter) CloseNotify() <-chan bool {
-	return w.ResponseWriter.(http.CloseNotifier).CloseNotify()
+	return w.rw.(http.CloseNotifier).CloseNotify()
 }
 
 func (w pusherResponseWriter) Push(target string, opts *http.PushOptions) error {
-	return w.ResponseWriter.(http.Pusher).Push(target, opts)
+	return w.rw.(http.Pusher).Push(target, opts)
 }
 
 func (w closeNotifyPusherResponseWriter) Push(target string, opts *http.PushOptions) error {
-	return w.ResponseWriter.(http.Pusher).Push(target, opts)
+	return w.rw.(http.Pusher).Push(target, opts)
 }

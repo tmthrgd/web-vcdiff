@@ -1,5 +1,6 @@
 import Module from '/vcddec.js';
 import Decoder from '/decoder.js';
+import * as idb from '/idb-keyval.js';
 
 const asUint8Array = async resp => new Uint8Array(await resp.arrayBuffer());
 
@@ -41,9 +42,7 @@ const decodeStream = (body, dict) => new ReadableStream({
 	},
 });
 
-const decodeBuffer = async (resp, dict) => {
-	const respBody = asUint8Array(resp);
-
+const decodeBuffer = async (respBody, dict) => {
 	let body = new Uint8Array(0);
 	let pos = 0;
 	const reserve = n => {
@@ -76,67 +75,72 @@ const decodeBuffer = async (resp, dict) => {
 	return body.subarray(0, pos);
 };
 
-const dictCache = caches.open('vcdiff-dict');
+const store = new idb.Store('vcdiff', 'dict-cache');
 
-const loadDict = async header => {
-	const cache = await dictCache;
+const flushCache = () => idb.clear(store);
 
-	const url = new URL(header, location);
-	const hash = url.hash && url.hash.slice(1);
-	url.hash = '';
-	const req = new Request(url, {
-		cache: 'no-store',
-		headers: hash ? { 'Expect-Diff-Hash': hash } : {},
-	});
-
-	const entry = await cache.match(req);
-	if (entry) {
-		return entry;
-	}
-
-	const resp = await fetch(req);
-	if (!resp.ok) {
-		throw new Error('failed to load ' + resp.url + ': ' + resp.statusText);
-	}
-
-	cache.put(req, resp.clone()).catch(err => {
-		console.error('failed to store dictionary in cache:', err);
-	});
-	return resp;
-};
-
-const flushCache = async () => {
-	const cache = await dictCache;
-	const keys = await cache.keys();
-	await Promise.all(keys.map(req => cache.delete(req)));
-};
+const readFile = file => new Promise((resolve, reject) => {
+	const fr = new FileReader();
+	fr.onload = () => resolve(new Uint8Array(fr.result));
+	fr.onerror = () => reject(fr.error);
+	fr.readAsArrayBuffer(file);
+});
 
 const decode = async resp => {
 	const encHdr = resp.headers.get('Content-Diff-Encoding');
-	if (!encHdr || encHdr.toLowerCase() !== 'vcdiff') {
+	if (!encHdr || !encHdr.toLowerCase().startsWith('vcdiff:')) {
 		return resp;
 	}
 
-	const dictHdr = resp.headers.get('Content-Diff-Dictionary');
-	if (!dictHdr) {
-		throw new Error('missing Content-Diff-Dictionary header for ' + resp.url);
+	const dictHash = encHdr.slice('vcdiff:'.length);
+	if (!dictHash || dictHash === '*') {
+		throw new Error('missing dictionary hash from Content-Diff-Encoding header: ' + encHdr);
 	}
 
-	const dict = loadDict(dictHdr).then(asUint8Array);
-	const body = resp.body ? decodeStream(resp.body, dict) : await decodeBuffer(resp, dict);
+	let body, newCT;
+	if (dictHash.startsWith('*')) {
+		const fd = await resp.formData();
+
+		const dict = readFile(fd.get('dict'));
+		dict.then(dict => idb.set(dictHash.slice(1), dict, store))
+			.catch(err => console.error('failed to cache dictionary ' + encHdr + ':', err));
+
+		const bodyFile = fd.get('body');
+		newCT = bodyFile.type;
+
+		body = await decodeBuffer(readFile(bodyFile), dict);
+	} else {
+		const dict = idb.get(dictHash, store);
+
+		body = resp.body
+			? decodeStream(resp.body, dict)
+			: await decodeBuffer(asUint8Array(resp), dict);
+	}
 
 	resp = new Response(body, resp);
 	resp.headers.delete('Content-Diff-Encoding');
-	resp.headers.delete('Content-Diff-Dictionary');
+
+	if (newCT) {
+		resp.headers.set('Content-Type', newCT);
+	}
+
 	return resp;
 };
 
-const request = (input, init) => {
+const request = async (input, init) => {
 	const req = new Request(input, init);
 	req.headers.set('Accept-Diff-Encoding', 'vcdiff');
+
+	const dicts = await idb.keys(store);
+	req.headers.set('Accept-Diff-Dictionaries', dicts.join(','));
+
 	return req;
 };
 
-const vcdiffFetch = (input, init) => fetch(request(input, init)).then(decode);
+const vcdiffFetch = async (input, init) => {
+	const req = await request(input, init);
+	const resp = await fetch(req);
+	return await decode(resp);
+};
 
 export { request, decode, vcdiffFetch as fetch, flushCache };
