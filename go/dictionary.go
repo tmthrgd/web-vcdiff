@@ -1,6 +1,8 @@
 package vcdiff
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha512"
 	"encoding/base64"
@@ -9,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	handlers "github.com/tmthrgd/httphandlers"
 	"github.com/tmthrgd/httputils"
@@ -40,10 +43,16 @@ func (id *DictionaryID) decode(s string) bool {
 type Dictionary struct {
 	ID   DictionaryID
 	Data []byte
+
+	gzipOnce sync.Once
+	gzipData []byte
 }
 
 func NewDictionary(data []byte) *Dictionary {
-	return &Dictionary{newDictionaryID(data), data}
+	return &Dictionary{
+		ID:   newDictionaryID(data),
+		Data: data,
+	}
 }
 
 func ReadDictionary(path string) (*Dictionary, error) {
@@ -59,6 +68,21 @@ func ReadDictionary(path string) (*Dictionary, error) {
 	}
 
 	return NewDictionary(data), nil
+}
+
+func (d *Dictionary) gzip() {
+	var buf bytes.Buffer
+	w, _ := gzip.NewWriterLevel(&buf, gzip.BestCompression)
+
+	if _, err := w.Write(d.Data); err != nil {
+		return
+	}
+
+	if err := w.Close(); err != nil {
+		return
+	}
+
+	d.gzipData = buf.Bytes()
 }
 
 type Dictionaries interface {
@@ -112,10 +136,20 @@ func DictionaryHandler(d Dictionaries) http.Handler {
 
 		hdr := w.Header()
 		hdr.Set("Content-Type", "application/octet-stream")
-		hdr.Set("Content-Length", strconv.Itoa(len(dict.Data)))
 		hdr.Set("Cache-Control", "public, max-age=31536000, immutable")
 		hdr.Set("Last-Modified", "Mon, 01 Jan 2001 01:00:00 GMT")
 
-		w.Write(dict.Data)
+		data := dict.Data
+		if httputils.Negotiate(r.Header, "Accept-Encoding", "gzip") == "gzip" {
+			dict.gzipOnce.Do(dict.gzip)
+
+			if dict.gzipData != nil && len(dict.gzipData) < len(dict.Data) {
+				hdr.Set("Content-Encoding", "gzip")
+				data = dict.gzipData
+			}
+		}
+
+		hdr.Set("Content-Length", strconv.Itoa(len(data)))
+		w.Write(data)
 	}))
 }
