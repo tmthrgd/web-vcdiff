@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -e -x
 
 EMCCDEBUGFLAGS=-g4
 #EMCCDEBUGFLAGS="-g0 -Oz --closure 1"
@@ -42,7 +42,7 @@ emcc -o build/libvcddec.bc $EMCCFLAGS -std=c++17 \
 	open-vcdiff/src/headerparser.cc \
 	open-vcdiff/src/vcdecoder.cc
 
-emcc -o build/vcddec.html $EMCCFLAGS -std=c++17 \
+emcc -o build/vcddec.js $EMCCFLAGS -std=c++17 \
 	-Iopen-vcdiff/src -Ibuild \
 	--post-js build/vcddec_glue.js \
 	build/libvcd{com,dec}.bc vcddec.cc
