@@ -24,6 +24,9 @@ func Handler(d Dictionaries, h http.Handler) http.Handler {
 			http.Error(w, http.StatusText(http.StatusInternalServerError),
 				http.StatusInternalServerError)
 			return
+		} else if dict == nil {
+			h.ServeHTTP(w, r)
+			return
 		}
 
 		if dict.ID != newDictionaryID(dict.Data) {
