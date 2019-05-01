@@ -80,7 +80,10 @@ func (rw *responseWriter) WriteHeader(statusCode int) {
 	}
 	rw.wroteHeader = true
 
-	rw.Header().Del("Content-Length")
+	hdr := rw.Header()
+	hdr.Del("Content-Length")
+	hdr.Del("Etag")
+
 	rw.ResponseWriter.WriteHeader(statusCode)
 }
 
