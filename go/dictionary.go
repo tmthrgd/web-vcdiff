@@ -94,6 +94,10 @@ func DictionaryHandler(d Dictionaries) http.Handler {
 			!id.decode(r.URL.Path[len(DictionaryHandlerPath):]) {
 			http.NotFound(w, r)
 			return
+		} else if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed),
+				http.StatusMethodNotAllowed)
+			return
 		}
 
 		dict, err := d.Find(id)
