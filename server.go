@@ -32,6 +32,10 @@ func main() {
 			http.FileServer(http.Dir(dir))))
 	}
 
+	js := http.FileServer(http.Dir("js"))
+	mux.Handle("/decoder.js", js)
+	mux.Handle("/vcdiff.js", js)
+
 	d, err := vcdiff.ReadDictionary("html/test.dict")
 	if err != nil {
 		log.Fatal(err)

@@ -1,5 +1,5 @@
-import Module from '/vcddec.js';
-import Decoder from '/decoder.js';
+import Module from './vcddec.js';
+import Decoder from './decoder.js';
 
 const asUint8Array = async resp => new Uint8Array(await resp.arrayBuffer());
 
