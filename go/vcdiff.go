@@ -89,10 +89,7 @@ func (rw *responseWriter) WriteHeader(statusCode int) {
 
 func (rw *responseWriter) Write(p []byte) (int, error) {
 	if !rw.wroteHeader && rw.err == nil {
-		if rw.Header().Get("Content-Type") == "" {
-			rw.Header().Set("Content-Type", http.DetectContentType(p))
-		}
-
+		rw.sniffContentType(p)
 		rw.WriteHeader(http.StatusOK)
 	}
 	if rw.enc == nil && rw.err == nil {
@@ -108,6 +105,16 @@ func (rw *responseWriter) Write(p []byte) (int, error) {
 	}
 
 	return n, err
+}
+
+func (rw *responseWriter) sniffContentType(p []byte) {
+	hdr := rw.Header()
+	_, haveType := hdr["Content-Type"]
+	if haveType || len(p) == 0 {
+		return
+	}
+
+	hdr.Set("Content-Type", http.DetectContentType(p))
 }
 
 func (rw *responseWriter) startVCDIFF() {
