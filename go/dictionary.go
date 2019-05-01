@@ -1,6 +1,7 @@
 package vcdiff
 
 import (
+	"context"
 	"crypto/sha512"
 	"encoding/base64"
 	"io/ioutil"
@@ -68,7 +69,7 @@ func (d *Dictionary) checkValid() {
 
 type Dictionaries interface {
 	Select(*http.Request) (*Dictionary, error)
-	Find(DictionaryID) (*Dictionary, error)
+	Find(context.Context, DictionaryID) (*Dictionary, error)
 }
 
 func FixedDictionary(d *Dictionary) Dictionaries { return (*fixedDictionary)(d) }
@@ -77,7 +78,7 @@ type fixedDictionary Dictionary
 
 func (d *fixedDictionary) Select(*http.Request) (*Dictionary, error) { return (*Dictionary)(d), nil }
 
-func (d *fixedDictionary) Find(id DictionaryID) (*Dictionary, error) {
+func (d *fixedDictionary) Find(ctx context.Context, id DictionaryID) (*Dictionary, error) {
 	if d.ID == id {
 		return (*Dictionary)(d), nil
 	}
@@ -100,7 +101,7 @@ func DictionaryHandler(d Dictionaries) http.Handler {
 			return
 		}
 
-		dict, err := d.Find(id)
+		dict, err := d.Find(r.Context(), id)
 		if err != nil {
 			httputils.RequestLogf(r, "dictionary callback failed: %v", err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError),
