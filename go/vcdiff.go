@@ -89,6 +89,16 @@ func (rw *responseWriter) WriteHeader(statusCode int) {
 	hdr.Del("Content-Length")
 	hdr.Del("Etag")
 
+	if statusCode == http.StatusNotModified {
+		// RFC 7232 section 4.1:
+		//  a sender SHOULD NOT generate representation metadata other than the
+		//  above listed fields unless said metadata exists for the purpose of
+		//  guiding cache updates (e.g., Last-Modified might be useful if the
+		//  response does not have an ETag field).
+		hdr.Del("Content-Diff-Encoding")
+		hdr.Del("Content-Diff-Dictionary")
+	}
+
 	rw.ResponseWriter.WriteHeader(statusCode)
 }
 
