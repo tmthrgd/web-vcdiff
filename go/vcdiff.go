@@ -107,6 +107,9 @@ func (rw *responseWriter) Write(p []byte) (int, error) {
 		rw.sniffContentType(p)
 		rw.WriteHeader(http.StatusOK)
 	}
+	if len(p) == 0 {
+		return 0, rw.err
+	}
 	if rw.enc == nil && rw.err == nil {
 		rw.startVCDIFF()
 	}
