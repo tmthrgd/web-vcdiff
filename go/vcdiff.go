@@ -10,8 +10,7 @@ import (
 
 func Handler(d Dictionaries, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hdr := w.Header()
-		hdr.Add("Vary", "Accept-Diff-Encoding")
+		w.Header().Add("Vary", "Accept-Diff-Encoding")
 
 		if !httpguts.HeaderValuesContainsToken(r.Header["Accept-Diff-Encoding"], "vcdiff") {
 			h.ServeHTTP(w, r)
@@ -33,14 +32,11 @@ func Handler(d Dictionaries, h http.Handler) http.Handler {
 			panic("vcdiff: invalid dictionary identifier")
 		}
 
-		hdr.Set("Content-Diff-Encoding", "vcdiff")
-		hdr.Set("Content-Diff-Dictionary", dict.ID.encode())
-
 		dw := &responseWriter{
 			ResponseWriter: w,
 			req:            r,
 
-			dictBytes: dict.Data,
+			selectedDict: dict,
 		}
 		defer func() {
 			dw.closeVCDIFF()
@@ -70,7 +66,7 @@ type responseWriter struct {
 	http.ResponseWriter
 	req *http.Request
 
-	dictBytes []byte
+	selectedDict *Dictionary
 
 	dict *openvcdiff.Dictionary
 	enc  *openvcdiff.Encoder
@@ -89,14 +85,14 @@ func (rw *responseWriter) WriteHeader(statusCode int) {
 	hdr.Del("Content-Length")
 	hdr.Del("Etag")
 
-	if statusCode == http.StatusNotModified {
-		// RFC 7232 section 4.1:
-		//  a sender SHOULD NOT generate representation metadata other than the
-		//  above listed fields unless said metadata exists for the purpose of
-		//  guiding cache updates (e.g., Last-Modified might be useful if the
-		//  response does not have an ETag field).
-		hdr.Del("Content-Diff-Encoding")
-		hdr.Del("Content-Diff-Dictionary")
+	// RFC 7232 section 4.1:
+	//  a sender SHOULD NOT generate representation metadata other than the
+	//  above listed fields unless said metadata exists for the purpose of
+	//  guiding cache updates (e.g., Last-Modified might be useful if the
+	//  response does not have an ETag field).
+	if statusCode != http.StatusNotModified {
+		hdr.Set("Content-Diff-Encoding", "vcdiff")
+		hdr.Set("Content-Diff-Dictionary", rw.selectedDict.ID.encode())
 	}
 
 	rw.ResponseWriter.WriteHeader(statusCode)
@@ -133,7 +129,7 @@ func (rw *responseWriter) sniffContentType(p []byte) {
 }
 
 func (rw *responseWriter) startVCDIFF() {
-	rw.dict, rw.err = openvcdiff.NewDictionary(rw.dictBytes)
+	rw.dict, rw.err = openvcdiff.NewDictionary(rw.selectedDict.Data)
 	if rw.err != nil {
 		return
 	}
