@@ -80,7 +80,7 @@ type responseWriter struct {
 }
 
 func (rw *responseWriter) WriteHeader(statusCode int) {
-	if rw.err != nil || rw.wroteHeader {
+	if rw.wroteHeader {
 		return
 	}
 	rw.wroteHeader = true
@@ -103,7 +103,7 @@ func (rw *responseWriter) WriteHeader(statusCode int) {
 }
 
 func (rw *responseWriter) Write(p []byte) (int, error) {
-	if !rw.wroteHeader && rw.err == nil {
+	if !rw.wroteHeader {
 		rw.sniffContentType(p)
 		rw.WriteHeader(http.StatusOK)
 	}
