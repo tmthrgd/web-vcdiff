@@ -74,15 +74,9 @@ func (d *Dictionary) gzip() {
 	var buf bytes.Buffer
 	w, _ := gzip.NewWriterLevel(&buf, gzip.BestCompression)
 
-	if _, err := w.Write(d.Data); err != nil {
-		return
-	}
-
-	if err := w.Close(); err != nil {
-		return
-	}
-
-	if buf.Len() < len(d.Data) {
+	_, err := w.Write(d.Data)
+	if err == nil && w.Close() == nil &&
+		buf.Len() < len(d.Data) {
 		d.gzipData = buf.Bytes()
 	}
 }
