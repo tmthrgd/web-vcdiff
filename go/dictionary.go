@@ -86,15 +86,15 @@ type Dictionaries interface {
 	Find(context.Context, DictionaryID) (*Dictionary, error)
 }
 
-func FixedDictionary(d *Dictionary) Dictionaries { return (*fixedDictionary)(d) }
+func FixedDictionary(d *Dictionary) Dictionaries { return fixedDictionary{d} }
 
-type fixedDictionary Dictionary
+type fixedDictionary struct{ d *Dictionary }
 
-func (d *fixedDictionary) Select(*http.Request) (*Dictionary, error) { return (*Dictionary)(d), nil }
+func (fd fixedDictionary) Select(*http.Request) (*Dictionary, error) { return fd.d, nil }
 
-func (d *fixedDictionary) Find(ctx context.Context, id DictionaryID) (*Dictionary, error) {
-	if d.ID == id {
-		return (*Dictionary)(d), nil
+func (fd fixedDictionary) Find(ctx context.Context, id DictionaryID) (*Dictionary, error) {
+	if fd.d.ID == id {
+		return fd.d, nil
 	}
 
 	return nil, nil
