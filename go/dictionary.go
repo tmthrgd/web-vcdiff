@@ -110,6 +110,7 @@ func DictionaryHandler(d Dictionaries) http.Handler {
 			http.NotFound(w, r)
 			return
 		} else if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed),
 				http.StatusMethodNotAllowed)
 			return
