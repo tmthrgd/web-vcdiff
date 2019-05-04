@@ -82,7 +82,9 @@ func (d *Dictionary) gzip() {
 		return
 	}
 
-	d.gzipData = buf.Bytes()
+	if buf.Len() < len(d.Data) {
+		d.gzipData = buf.Bytes()
+	}
 }
 
 type Dictionaries interface {
@@ -143,7 +145,7 @@ func DictionaryHandler(d Dictionaries) http.Handler {
 		if httputils.Negotiate(r.Header, "Accept-Encoding", "gzip") == "gzip" {
 			dict.gzipOnce.Do(dict.gzip)
 
-			if dict.gzipData != nil && len(dict.gzipData) < len(dict.Data) {
+			if dict.gzipData != nil {
 				hdr.Set("Content-Encoding", "gzip")
 				data = dict.gzipData
 			}
