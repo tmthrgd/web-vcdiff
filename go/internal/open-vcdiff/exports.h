@@ -17,3 +17,12 @@ int VCDiffStreamingEncoderEncodeChunk(VCDiffStreamingEncoderPtr, int,
                                       const char *, size_t);
 
 int VCDiffStreamingEncoderFinishEncoding(VCDiffStreamingEncoderPtr, int);
+
+typedef void *VCDiffStreamingDecoderPtr;
+
+VCDiffStreamingDecoderPtr NewVCDiffStreamingDecoder(const char *, size_t);
+
+int VCDiffStreamingDecoderDecodeChunk(VCDiffStreamingDecoderPtr, int,
+                                      const char *, size_t);
+
+int VCDiffStreamingDecoderFinishDecoding(VCDiffStreamingDecoderPtr);

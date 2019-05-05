@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <google/vcdecoder.h>
 #include <google/vcencoder.h>
 
 extern "C" void goOpenVCDIFFWriterWrite(int, const char *, size_t);
@@ -77,7 +78,38 @@ int VCDiffStreamingEncoderFinishEncoding(VCDiffStreamingEncoderPtr ptr,
 	auto obj = static_cast<open_vcdiff::VCDiffStreamingEncoder *>(ptr);
 
 	OutputGo out(writer_idx);
-	auto ok = obj->FinishEncodingToInterface(&out);
+	bool ok = obj->FinishEncodingToInterface(&out);
+
+	delete obj;
+	return ok;
+}
+
+VCDiffStreamingDecoderPtr NewVCDiffStreamingDecoder(const char *dictionary_ptr,
+                                                    size_t dictionary_size) {
+	auto obj = new open_vcdiff::VCDiffStreamingDecoder();
+	obj->StartDecoding(dictionary_ptr, dictionary_size);
+
+	return static_cast<VCDiffStreamingDecoderPtr>(obj);
+}
+
+int VCDiffStreamingDecoderDecodeChunk(VCDiffStreamingDecoderPtr ptr,
+                                      int writer_idx, const char *data,
+                                      size_t len) {
+	auto obj = static_cast<open_vcdiff::VCDiffStreamingDecoder *>(ptr);
+
+	OutputGo out(writer_idx);
+	if (!obj->DecodeChunkToInterface(data, len, &out)) {
+		delete obj;
+		return false;
+	}
+
+	return true;
+}
+
+int VCDiffStreamingDecoderFinishDecoding(VCDiffStreamingDecoderPtr ptr) {
+	auto obj = static_cast<open_vcdiff::VCDiffStreamingDecoder *>(ptr);
+
+	bool ok = obj->FinishDecoding();
 
 	delete obj;
 	return ok;
