@@ -88,9 +88,11 @@ const decodeBuffer = async (resp, dict) => {
 const dictionaryHandlerPath = '/.well-known/web-vcdiff/d/';
 
 const loadDict = async (header, base) => {
-	const req = new Request(
-		new URL(dictionaryHandlerPath + header, base),
-		{ cache: 'force-cache' });
+	const url = new URL(dictionaryHandlerPath + header, base);
+	const req = new Request(url, {
+		cache: 'force-cache',
+		redirect: 'error',
+	});
 
 	const resp = await fetch(req);
 	if (!resp.ok) {
