@@ -188,7 +188,7 @@ func sriValid(integrity string, b []byte) bool {
 		}
 
 		d, err := base64.StdEncoding.DecodeString(digest)
-		if err != nil || h.Size() != len(d) {
+		if err != nil || len(d) != h.Size() {
 			continue
 		}
 
