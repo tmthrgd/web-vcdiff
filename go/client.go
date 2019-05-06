@@ -214,7 +214,7 @@ func sriValid(integrity string, b []byte) bool {
 	sum := h.Sum(nil)
 
 	for _, digest := range digests {
-		if idx := strings.Index(digest, "?"); idx > 0 {
+		if idx := strings.Index(digest, "?"); idx >= 0 {
 			digest = digest[:idx]
 		}
 
