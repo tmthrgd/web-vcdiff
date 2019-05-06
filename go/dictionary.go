@@ -19,13 +19,6 @@ import (
 
 type DictionaryID [16]byte
 
-func newDictionaryID(data []byte) DictionaryID {
-	digest := sha512.Sum512_256(data)
-	var id DictionaryID
-	copy(id[:], digest[:])
-	return id
-}
-
 func (id DictionaryID) encode() string {
 	return base64.RawURLEncoding.EncodeToString(id[:])
 }
@@ -51,8 +44,11 @@ type Dictionary struct {
 }
 
 func NewDictionary(data []byte) *Dictionary {
-	id := newDictionaryID(data)
 	digest := sha512.Sum384(data)
+
+	var id DictionaryID
+	copy(id[:], digest[:])
+
 	return &Dictionary{
 		ID:   id,
 		Data: data,
@@ -74,6 +70,11 @@ func ReadDictionary(path string) (*Dictionary, error) {
 	}
 
 	return NewDictionary(data), nil
+}
+
+func (d *Dictionary) validID() bool {
+	digest := sha512.Sum384(d.Data)
+	return bytes.HasPrefix(digest[:], d.ID[:])
 }
 
 func (d *Dictionary) gzip() {
@@ -132,7 +133,7 @@ func DictionaryHandler(d Dictionaries) http.Handler {
 			return
 		}
 
-		if dict.ID != id || dict.ID != newDictionaryID(dict.Data) {
+		if dict.ID != id || !dict.validID() {
 			panic("vcdiff: invalid dictionary identifier")
 		}
 

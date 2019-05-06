@@ -28,7 +28,7 @@ func Handler(d Dictionaries, h http.Handler) http.Handler {
 			return
 		}
 
-		if dict.ID != newDictionaryID(dict.Data) {
+		if !dict.validID() {
 			panic("vcdiff: invalid dictionary identifier")
 		}
 
