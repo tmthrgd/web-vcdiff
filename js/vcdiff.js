@@ -109,20 +109,18 @@ const decode = async resp => {
 		return resp;
 	}
 
-	const dictHdr = resp.headers.get('Content-Diff-Dictionary');
-	if (!dictHdr) {
+	const identifier = resp.headers.get('Content-Diff-Dictionary');
+	if (!identifier || identifier.startsWith(';')) {
 		throw new Error('missing Content-Diff-Dictionary header for ' + resp.url);
 	}
 
-	const integrityHdr = resp.headers.get('Content-Diff-Dictionary-Integrity') || '';
-
-	const dict = loadDict(dictHdr, resp.url, integrityHdr);
+	const parts = identifier.split(';', 2);
+	const dict = loadDict(parts[0], resp.url, parts[1] || '');
 	const body = resp.body ? decodeStream(resp.body, dict) : await decodeBuffer(resp, dict);
 
 	resp = new Response(body, resp);
 	resp.headers.delete('Content-Diff-Encoding');
 	resp.headers.delete('Content-Diff-Dictionary');
-	resp.headers.delete('Content-Diff-Dictionary-Integrity');
 	return resp;
 };
 

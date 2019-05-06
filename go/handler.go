@@ -92,8 +92,7 @@ func (rw *responseWriter) WriteHeader(statusCode int) {
 	//  response does not have an ETag field).
 	if statusCode != http.StatusNotModified {
 		hdr.Set("Content-Diff-Encoding", "vcdiff")
-		hdr.Set("Content-Diff-Dictionary", rw.selectedDict.ID.encode())
-		hdr.Set("Content-Diff-Dictionary-Integrity", rw.selectedDict.integrity)
+		hdr.Set("Content-Diff-Dictionary", rw.selectedDict.ID.encode()+"; "+rw.selectedDict.integrity)
 	}
 
 	rw.ResponseWriter.WriteHeader(statusCode)

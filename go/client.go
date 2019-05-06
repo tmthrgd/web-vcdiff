@@ -72,13 +72,18 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return resp, nil
 	}
 
-	dictHdr := resp.Header.Get("Content-Diff-Dictionary")
-	if dictHdr == "" {
+	identifier := resp.Header.Get("Content-Diff-Dictionary")
+	if identifier == "" || strings.HasPrefix(identifier, ";") {
 		return nil, errors.New("vcdiff: missing required Content-Diff-Dictionary header")
 	}
 
+	var integrity string
+	if idx := strings.Index(identifier, ";"); idx >= 0 {
+		identifier, integrity = identifier[:idx], identifier[idx+1:]
+	}
+
 	dictURL := *resp.Request.URL
-	dictURL.Path = DictionaryHandlerPath + dictHdr
+	dictURL.Path = DictionaryHandlerPath + identifier
 	dictURL.RawQuery = ""
 
 	dict, err := rt.getDict(dictURL.String())
@@ -86,7 +91,6 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("vcdiff: dictionary fetch failed: %v", err)
 	}
 
-	integrity := resp.Header.Get("Content-Diff-Dictionary-Integrity")
 	if integrity != "" && !sriValid(integrity, dict) {
 		return nil, errors.New("vcdiff: dictionary response failed subresource integrity check")
 	}
@@ -105,7 +109,6 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp2.Header = cloneHeaders(resp.Header)
 	resp2.Header.Del("Content-Diff-Encoding")
 	resp2.Header.Del("Content-Diff-Dictionary")
-	resp2.Header.Del("Content-Diff-Dictionary-Integrity")
 
 	return &resp2, nil
 }
