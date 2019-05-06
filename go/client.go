@@ -95,11 +95,8 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, errors.New("vcdiff: dictionary response failed subresource integrity check")
 	}
 
-	pr, pw := io.Pipe()
-	go decodeBody(pw, resp.Body, dict)
-
 	resp2 := *resp
-	resp2.Body = struct{ io.ReadCloser }{pr}
+	resp2.Body = &bodyDecoder{nil, resp.Body, dict}
 
 	resp2.Header = cloneHeaders(resp.Header)
 	resp2.Header.Del("Content-Diff-Encoding")
@@ -124,6 +121,40 @@ func (rt *roundTripper) getDict(url string) ([]byte, error) {
 		return ioutil.ReadAll(resp.Body)
 	})
 	return fn.(func() ([]byte, error))()
+}
+
+type bodyDecoder struct {
+	pr *io.PipeReader
+
+	body io.ReadCloser
+	dict []byte
+}
+
+func (bd *bodyDecoder) Read(p []byte) (int, error) {
+	if bd.pr == nil {
+		if bd.body == nil {
+			return 0, errors.New("http: read on closed response body")
+		}
+
+		pr, pw := io.Pipe()
+		go decodeBody(pw, bd.body, bd.dict)
+		*bd = bodyDecoder{pr: pr}
+	}
+
+	return bd.pr.Read(p)
+}
+
+func (bd *bodyDecoder) Close() error {
+	var err error
+	switch {
+	case bd.pr != nil:
+		err = bd.pr.Close()
+	case bd.body != nil:
+		err = bd.body.Close()
+	}
+
+	*bd = bodyDecoder{}
+	return err
 }
 
 func decodeBody(pw *io.PipeWriter, body io.ReadCloser, dict []byte) {
