@@ -1,8 +1,13 @@
 package vcdiff
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -81,6 +86,11 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("vcdiff: dictionary fetch failed: %v", err)
 	}
 
+	integrity := resp.Header.Get("Content-Diff-Dictionary-Integrity")
+	if integrity != "" && !sriValid(integrity, dict) {
+		return nil, errors.New("vcdiff: dictionary response failed subresource integrity check")
+	}
+
 	pr, pw := io.Pipe()
 	d, err := openvcdiff.NewDecoder(pw, dict)
 	if err != nil {
@@ -130,4 +140,47 @@ func copyBody(d *openvcdiff.Decoder, body io.ReadCloser, pw *io.PipeWriter) {
 	}
 
 	pw.CloseWithError(err)
+}
+
+type sriAlg struct {
+	newFn func() hash.Hash
+	bits  int
+}
+
+var sriAlgs = map[string]sriAlg{
+	"sha256": {sha256.New, 256},
+	"sha384": {sha512.New384, 384},
+	"sha512": {sha512.New, 512},
+}
+
+func sriValid(integrity string, b []byte) bool {
+	var (
+		bestAlg   sriAlg
+		b64Digest string
+	)
+	for _, integrity := range strings.Fields(integrity) {
+		parts := strings.SplitN(integrity, "-", 2)
+		alg := sriAlgs[parts[0]]
+		if len(parts) == 2 && bestAlg.bits < alg.bits {
+			bestAlg, b64Digest = alg, parts[1]
+		}
+	}
+
+	if bestAlg.newFn == nil {
+		return true
+	}
+
+	h := bestAlg.newFn()
+
+	if idx := strings.Index(b64Digest, "?"); idx > 0 {
+		b64Digest = b64Digest[:idx]
+	}
+
+	d, err := base64.StdEncoding.DecodeString(b64Digest)
+	if err != nil || h.Size() != len(d) {
+		return false
+	}
+
+	h.Write(b)
+	return bytes.Equal(h.Sum(nil), d)
 }
