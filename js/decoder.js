@@ -59,6 +59,9 @@ export default class {
 		if (!this._dictPtr) {
 			throw new Error('start must called before decode');
 		}
+		if (!this._dec) {
+			throw new Error('decode cannot be called after decode failure');
+		}
 
 		let ptr = this._chunkPtr;
 		if (!ptr || this._chunkLen < chunk.length) {
@@ -71,6 +74,9 @@ export default class {
 		this._heap.set(chunk, ptr);
 
 		if (!this._dec.DecodeChunkToInterface(ptr, chunk.length, this._out)) {
+			this._m.destroy(this._dec);
+			this._dec = null;
+
 			throw new Error('DecodeChunkToInterface failed');
 		}
 	}
@@ -78,6 +84,9 @@ export default class {
 	finish() {
 		if (!this._m) {
 			throw new Error('finish cannot be called after destroy');
+		}
+		if (!this._dec) {
+			throw new Error('finish cannot be called after decode failure');
 		}
 
 		if (!this._dec.FinishDecoding()) {
