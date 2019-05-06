@@ -123,16 +123,10 @@ type Decoder struct {
 	w *writer
 }
 
-func NewDecoder(w io.Writer, dict []byte) (*Decoder, error) {
+func NewDecoder(w io.Writer, dict []byte) *Decoder {
 	dictPtr := C.CBytes(dict)
-
 	ptr := C.NewVCDiffStreamingDecoder((*C.char)(dictPtr), C.ulong(len(dict)))
-	if ptr == nil {
-		C.free(dictPtr)
-		return nil, errors.New("open-vcdiff: failed to start decoder")
-	}
-
-	return &Decoder{ptr, dictPtr, writers.insert(w)}, nil
+	return &Decoder{ptr, dictPtr, writers.insert(w)}
 }
 
 func (d *Decoder) Write(p []byte) (int, error) {

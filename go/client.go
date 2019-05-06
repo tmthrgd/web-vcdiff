@@ -96,12 +96,7 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	pr, pw := io.Pipe()
-	d, err := openvcdiff.NewDecoder(pw, dict)
-	if err != nil {
-		return nil, err
-	}
-
-	go copyBody(d, resp.Body, pw)
+	go decodeBody(pw, resp.Body, dict)
 
 	resp2 := *resp
 	resp2.Body = struct{ io.ReadCloser }{pr}
@@ -131,7 +126,10 @@ func (rt *roundTripper) getDict(url string) ([]byte, error) {
 	return fn.(func() ([]byte, error))()
 }
 
-func copyBody(d *openvcdiff.Decoder, body io.ReadCloser, pw *io.PipeWriter) {
+func decodeBody(pw *io.PipeWriter, body io.ReadCloser, dict []byte) {
+	d := openvcdiff.NewDecoder(pw, dict)
+	defer d.Close()
+
 	_, err := io.Copy(d, body)
 
 	if closeErr := body.Close(); err == nil {
