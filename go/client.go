@@ -181,6 +181,7 @@ func sriValid(integrity string, b []byte) bool {
 	}
 
 	h := bestAlg.newFn()
+	buf := make([]byte, 0, h.Size())
 
 	for i, digest := range digests {
 		if idx := strings.Index(digest, "?"); idx > 0 {
@@ -198,7 +199,7 @@ func sriValid(integrity string, b []byte) bool {
 
 		h.Write(b)
 
-		if bytes.Equal(h.Sum(nil), d) {
+		if bytes.Equal(h.Sum(buf), d) {
 			return true
 		}
 	}
