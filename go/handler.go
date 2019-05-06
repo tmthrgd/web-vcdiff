@@ -93,6 +93,7 @@ func (rw *responseWriter) WriteHeader(statusCode int) {
 	if statusCode != http.StatusNotModified {
 		hdr.Set("Content-Diff-Encoding", "vcdiff")
 		hdr.Set("Content-Diff-Dictionary", rw.selectedDict.ID.encode())
+		hdr.Set("Content-Diff-Dictionary-Integrity", rw.selectedDict.integrity)
 	}
 
 	rw.ResponseWriter.WriteHeader(statusCode)

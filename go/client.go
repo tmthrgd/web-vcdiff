@@ -95,6 +95,7 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp2.Header = cloneHeaders(resp.Header)
 	resp2.Header.Del("Content-Diff-Encoding")
 	resp2.Header.Del("Content-Diff-Dictionary")
+	resp2.Header.Del("Content-Diff-Dictionary-Integrity")
 
 	return &resp2, nil
 }

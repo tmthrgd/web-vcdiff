@@ -87,11 +87,12 @@ const decodeBuffer = async (resp, dict) => {
 
 const dictionaryHandlerPath = '/.well-known/web-vcdiff/d/';
 
-const loadDict = async (header, base) => {
-	const url = new URL(dictionaryHandlerPath + header, base);
+const loadDict = async (identifier, base, integrity) => {
+	const url = new URL(dictionaryHandlerPath + identifier, base);
 	const req = new Request(url, {
 		cache: 'force-cache',
 		redirect: 'error',
+		integrity,
 	});
 
 	const resp = await fetch(req);
@@ -113,12 +114,15 @@ const decode = async resp => {
 		throw new Error('missing Content-Diff-Dictionary header for ' + resp.url);
 	}
 
-	const dict = loadDict(dictHdr, resp.url);
+	const integrityHdr = resp.headers.get('Content-Diff-Dictionary-Integrity') || '';
+
+	const dict = loadDict(dictHdr, resp.url, integrityHdr);
 	const body = resp.body ? decodeStream(resp.body, dict) : await decodeBuffer(resp, dict);
 
 	resp = new Response(body, resp);
 	resp.headers.delete('Content-Diff-Encoding');
 	resp.headers.delete('Content-Diff-Dictionary');
+	resp.headers.delete('Content-Diff-Dictionary-Integrity');
 	return resp;
 };
 

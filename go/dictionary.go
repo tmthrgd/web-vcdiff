@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
 	"io/ioutil"
@@ -44,14 +45,19 @@ type Dictionary struct {
 	ID   DictionaryID
 	Data []byte
 
+	integrity string
+
 	gzipOnce sync.Once
 	gzipData []byte
 }
 
 func NewDictionary(data []byte) *Dictionary {
+	digest := sha256.Sum256(data)
 	return &Dictionary{
 		ID:   newDictionaryID(data),
 		Data: data,
+
+		integrity: "sha256-" + base64.StdEncoding.EncodeToString(digest[:]),
 	}
 }
 
