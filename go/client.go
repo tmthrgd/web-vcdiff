@@ -155,14 +155,21 @@ var sriAlgs = map[string]sriAlg{
 
 func sriValid(integrity string, b []byte) bool {
 	var (
-		bestAlg   sriAlg
-		b64Digest string
+		bestAlg sriAlg
+		digests []string
 	)
 	for _, integrity := range strings.Fields(integrity) {
 		parts := strings.SplitN(integrity, "-", 2)
-		alg := sriAlgs[parts[0]]
-		if len(parts) == 2 && bestAlg.bits < alg.bits {
-			bestAlg, b64Digest = alg, parts[1]
+		alg, ok := sriAlgs[parts[0]]
+		if len(parts) != 2 || !ok {
+			continue
+		}
+
+		switch {
+		case bestAlg.bits < alg.bits:
+			bestAlg, digests = alg, parts[1:]
+		case bestAlg.bits == alg.bits:
+			digests = append(digests, parts[1])
 		}
 	}
 
@@ -172,15 +179,26 @@ func sriValid(integrity string, b []byte) bool {
 
 	h := bestAlg.newFn()
 
-	if idx := strings.Index(b64Digest, "?"); idx > 0 {
-		b64Digest = b64Digest[:idx]
+	for i, digest := range digests {
+		if idx := strings.Index(digest, "?"); idx > 0 {
+			digest = digest[:idx]
+		}
+
+		d, err := base64.StdEncoding.DecodeString(digest)
+		if err != nil || h.Size() != len(d) {
+			continue
+		}
+
+		if i > 0 {
+			h.Reset()
+		}
+
+		h.Write(b)
+
+		if bytes.Equal(h.Sum(nil), d) {
+			return true
+		}
 	}
 
-	d, err := base64.StdEncoding.DecodeString(b64Digest)
-	if err != nil || h.Size() != len(d) {
-		return false
-	}
-
-	h.Write(b)
-	return bytes.Equal(h.Sum(nil), d)
+	return false
 }
