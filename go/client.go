@@ -17,7 +17,7 @@ import (
 	openvcdiff "github.com/tmthrgd/web-vcdiff/go/internal/open-vcdiff"
 )
 
-func redirectAsError(req *http.Request, via []*http.Request) error {
+func redirectIsError(req *http.Request, via []*http.Request) error {
 	return errors.New("vcdiff: redirects are prohibitted for dictionary responses")
 }
 
@@ -47,7 +47,7 @@ func RoundTripper(t http.RoundTripper) http.RoundTripper {
 
 		dictClient: &http.Client{
 			Transport:     t,
-			CheckRedirect: redirectAsError,
+			CheckRedirect: redirectIsError,
 		},
 	}
 }
