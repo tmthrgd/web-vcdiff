@@ -210,25 +210,16 @@ func sriValid(integrity string, b []byte) bool {
 	}
 
 	h := bestAlg.newFn()
-	buf := make([]byte, 0, h.Size())
+	h.Write(b)
+	sum := h.Sum(nil)
 
-	for i, digest := range digests {
+	for _, digest := range digests {
 		if idx := strings.Index(digest, "?"); idx > 0 {
 			digest = digest[:idx]
 		}
 
 		d, err := base64.StdEncoding.DecodeString(digest)
-		if err != nil || len(d) != h.Size() {
-			continue
-		}
-
-		if i > 0 {
-			h.Reset()
-		}
-
-		h.Write(b)
-
-		if bytes.Equal(h.Sum(buf), d) {
+		if err == nil && bytes.Equal(sum, d) {
 			return true
 		}
 	}
