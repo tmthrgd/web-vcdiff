@@ -44,19 +44,20 @@ type Dictionary struct {
 	ID   DictionaryID
 	Data []byte
 
-	integrity string
+	header string
 
 	gzipOnce sync.Once
 	gzipData []byte
 }
 
 func NewDictionary(data []byte) *Dictionary {
+	id := newDictionaryID(data)
 	digest := sha512.Sum384(data)
 	return &Dictionary{
-		ID:   newDictionaryID(data),
+		ID:   id,
 		Data: data,
 
-		integrity: "sha384-" + base64.StdEncoding.EncodeToString(digest[:]),
+		header: id.encode() + "; sha384-" + base64.StdEncoding.EncodeToString(digest[:]),
 	}
 }
 
@@ -80,8 +81,7 @@ func (d *Dictionary) gzip() {
 	w, _ := gzip.NewWriterLevel(&buf, gzip.BestCompression)
 
 	_, err := w.Write(d.Data)
-	if err == nil && w.Close() == nil &&
-		buf.Len() < len(d.Data) {
+	if err == nil && w.Close() == nil && buf.Len() < len(d.Data) {
 		d.gzipData = buf.Bytes()
 	}
 }
