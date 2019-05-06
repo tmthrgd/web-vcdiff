@@ -2,6 +2,7 @@ package openvcdiff
 
 // #cgo LDFLAGS: -L${SRCDIR}/../../../build/open-vcdiff -lvcddec -lvcdenc -lvcdcom
 // #cgo CPPFLAGS: -I${SRCDIR}/../../../open-vcdiff/src
+// #include "stdlib.h"
 // #include "exports.h"
 import "C"
 
@@ -117,21 +118,21 @@ func (e *Encoder) Close() error {
 type Decoder struct {
 	ptr C.VCDiffStreamingDecoderPtr
 
+	dictPtr unsafe.Pointer
+
 	w *writer
 }
 
 func NewDecoder(w io.Writer, dict []byte) (*Decoder, error) {
-	var dictPtr *byte
-	if len(dict) > 0 {
-		dictPtr = &dict[0]
-	}
+	dictPtr := C.CBytes(dict)
 
-	ptr := C.NewVCDiffStreamingDecoder((*C.char)(unsafe.Pointer(dictPtr)), C.ulong(len(dict)))
+	ptr := C.NewVCDiffStreamingDecoder((*C.char)(dictPtr), C.ulong(len(dict)))
 	if ptr == nil {
+		C.free(dictPtr)
 		return nil, errors.New("open-vcdiff: failed to start decoder")
 	}
 
-	return &Decoder{ptr, writers.insert(w)}, nil
+	return &Decoder{ptr, dictPtr, writers.insert(w)}, nil
 }
 
 func (d *Decoder) Write(p []byte) (int, error) {
@@ -172,6 +173,7 @@ func (d *Decoder) Close() error {
 
 func (d *Decoder) reset() {
 	d.ptr = nil
+	C.free(d.dictPtr)
 	writers.delete(d.w)
 }
 
