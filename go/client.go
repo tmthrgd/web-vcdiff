@@ -106,6 +106,10 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func (rt *roundTripper) getDict(url string) ([]byte, error) {
+	if fn, ok := rt.cache.Load(url); ok {
+		return fn.(func() ([]byte, error))()
+	}
+
 	var (
 		c = rt.dictClient
 
