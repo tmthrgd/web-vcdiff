@@ -34,7 +34,7 @@ type roundTripper struct {
 	t http.RoundTripper
 
 	dictClient *http.Client
-	cache      sync.Map // map[string]func() ([]byte, error)
+	dictCache  sync.Map // map[string]func() ([]byte, error)
 }
 
 func RoundTripper(t http.RoundTripper) http.RoundTripper {
@@ -106,7 +106,7 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func (rt *roundTripper) getDict(url string) ([]byte, error) {
-	if fn, ok := rt.cache.Load(url); ok {
+	if fn, ok := rt.dictCache.Load(url); ok {
 		return fn.(func() ([]byte, error))()
 	}
 
@@ -117,7 +117,7 @@ func (rt *roundTripper) getDict(url string) ([]byte, error) {
 		body []byte
 		err  error
 	)
-	fn, _ := rt.cache.LoadOrStore(url, func() ([]byte, error) {
+	fn, _ := rt.dictCache.LoadOrStore(url, func() ([]byte, error) {
 		once.Do(func() {
 			var resp *http.Response
 			if resp, err = c.Get(url); err != nil {
