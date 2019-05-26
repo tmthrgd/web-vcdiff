@@ -106,19 +106,29 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func (rt *roundTripper) getDict(url string) ([]byte, error) {
-	c := rt.dictClient
+	var (
+		c = rt.dictClient
+
+		once sync.Once
+		body []byte
+		err  error
+	)
 	fn, _ := rt.cache.LoadOrStore(url, func() ([]byte, error) {
-		resp, err := c.Get(url)
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Body.Close()
+		once.Do(func() {
+			var resp *http.Response
+			if resp, err = c.Get(url); err != nil {
+				return
+			}
+			defer resp.Body.Close()
 
-		if resp.StatusCode != http.StatusOK {
-			return nil, errors.New(resp.Status)
-		}
+			if resp.StatusCode != http.StatusOK {
+				err = errors.New(resp.Status)
+				return
+			}
 
-		return ioutil.ReadAll(resp.Body)
+			body, err = ioutil.ReadAll(resp.Body)
+		})
+		return body, err
 	})
 	return fn.(func() ([]byte, error))()
 }
