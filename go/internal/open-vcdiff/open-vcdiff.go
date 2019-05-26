@@ -143,7 +143,7 @@ func (d *Decoder) Write(p []byte) (int, error) {
 
 	if C.VCDiffStreamingDecoderDecodeChunk(d.ptr, C.int(d.w.idx),
 		(*C.char)(unsafe.Pointer(&p[0])), C.ulong(len(p))) != 1 {
-		d.reset()
+		d.destroy()
 		return 0, errors.New("open-vcdiff: failed to decode chunk")
 	}
 
@@ -156,7 +156,7 @@ func (d *Decoder) Close() error {
 	}
 
 	ok := C.VCDiffStreamingDecoderFinishDecoding(d.ptr)
-	d.reset()
+	d.destroy()
 
 	if ok != 1 {
 		return errors.New("open-vcdiff: failed to finish decoding")
@@ -165,7 +165,7 @@ func (d *Decoder) Close() error {
 	return d.w.err
 }
 
-func (d *Decoder) reset() {
+func (d *Decoder) destroy() {
 	d.ptr = nil
 	C.free(d.dictPtr)
 	writers.delete(d.w)
