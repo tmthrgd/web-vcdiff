@@ -14,7 +14,7 @@ import (
 	"strings"
 	"sync"
 
-	openvcdiff "github.com/tmthrgd/web-vcdiff/go/internal/open-vcdiff"
+	openvcdiff "go.tmthrgd.dev/web-vcdiff/go/internal/open-vcdiff"
 )
 
 func redirectIsError(req *http.Request, via []*http.Request) error {

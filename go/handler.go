@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/tmthrgd/httputils"
-	openvcdiff "github.com/tmthrgd/web-vcdiff/go/internal/open-vcdiff"
+	openvcdiff "go.tmthrgd.dev/web-vcdiff/go/internal/open-vcdiff"
 	"golang.org/x/net/http/httpguts"
 )
 

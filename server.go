@@ -8,7 +8,7 @@ import (
 	"os"
 
 	handlers "github.com/tmthrgd/httphandlers"
-	vcdiff "github.com/tmthrgd/web-vcdiff/go"
+	vcdiff "go.tmthrgd.dev/web-vcdiff/go"
 )
 
 func main() {

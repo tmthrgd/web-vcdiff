@@ -1,4 +1,4 @@
-module tmthrgd.dev/go/web-vcdiff
+module go.tmthrgd.dev/web-vcdiff
 
 go 1.12
 
