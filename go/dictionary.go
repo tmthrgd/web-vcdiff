@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -58,13 +57,7 @@ func NewDictionary(data []byte) *Dictionary {
 }
 
 func ReadDictionary(path string) (*Dictionary, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	data, err := ioutil.ReadAll(f)
+	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
